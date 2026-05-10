@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OMR 3단 분할 자동 채점기 & 메일머지</title>
+    <title>OMR 자동 채점 & 명부 연동 시스템</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <script>
@@ -27,41 +27,57 @@
                 margin-bottom: 20px; box-shadow: none;
             }
         }
-        
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
     </style>
 </head>
 <body class="p-6">
     <div id="main-ui" class="max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-6 flex flex-col md:flex-row gap-6 no-print">
+        
+        <!-- 왼쪽 컨트롤 패널 -->
         <div class="w-full md:w-1/3 flex flex-col gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-gray-800">OMR 자동 채점기</h1>
-                <p class="text-xs text-blue-600 mt-1 font-bold">✓ 일괄 스캔 + 엑셀 정답 붙여넣기 지원 + 메일머지</p>
+                <p class="text-xs text-blue-600 mt-1 font-bold">✓ 명부 연동 + 결시 처리 + 엑셀 정오표(25자리) + 메일머지</p>
             </div>
             
-            <div class="bg-blue-50 p-3 rounded-md border border-blue-100">
-                <h2 class="text-sm font-bold text-blue-800 mb-2">1. 시험 설정 및 정답 입력</h2>
-                <div class="grid grid-cols-2 gap-3 mb-3">
+            <div class="bg-blue-50 p-3 rounded-md border border-blue-100 flex flex-col gap-3">
+                <h2 class="text-sm font-bold text-blue-800">1. 시험 기본 설정</h2>
+                
+                <div class="flex gap-2">
+                    <div class="flex-grow">
+                        <label class="block text-xs font-medium text-gray-700">과목/시험명</label>
+                        <input type="text" id="subjectName" value="수학 3단원" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-medium text-gray-700">객관식 문항 수</label>
-                        <input type="number" id="objCount" value="16" min="1" max="20" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm">
+                        <input type="number" id="objCount" value="16" min="1" max="25" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-700">주관식 문항 수</label>
-                        <input type="number" id="subjCount" value="4" min="0" max="4" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm">
+                        <input type="number" id="subjCount" value="4" min="0" max="10" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm">
                     </div>
                 </div>
 
                 <div>
                     <div class="flex justify-between items-end mb-1">
-                        <label class="block text-xs font-medium text-gray-700">객관식 정답 표 (엑셀 붙여넣기 지원)</label>
-                        <button id="btnClearAnswers" class="text-[10px] text-gray-600 bg-gray-200 hover:bg-gray-300 transition px-2 py-0.5 rounded">전체 지우기</button>
+                        <label class="block text-xs font-medium text-gray-700">객관식 정답 표 (엑셀 붙여넣기)</label>
+                        <button id="btnClearAnswers" class="text-[10px] text-gray-600 bg-gray-200 hover:bg-gray-300 transition px-2 py-0.5 rounded">지우기</button>
                     </div>
                     <div class="overflow-x-auto border border-gray-300 rounded bg-white">
                         <table class="w-full text-center text-xs whitespace-nowrap" id="answerTable"></table>
                     </div>
-                    <p class="text-[10px] text-gray-500 mt-1">* 엑셀의 정답 데이터를 복사하여 표를 클릭 후 <b>[Ctrl + V]</b> 하세요.</p>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-end mb-1">
+                        <label class="block text-xs font-medium text-gray-700">학생 명부 (선택사항)</label>
+                    </div>
+                    <textarea id="rosterInput" rows="3" placeholder="엑셀에서 '학반', '번호', '이름' 3개 열을 복사해서 이곳에 붙여넣으세요." class="w-full border border-gray-300 rounded p-2 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 whitespace-pre text-gray-600"></textarea>
+                    <p class="text-[10px] text-gray-500 mt-1">* 명부를 넣으면 결시자가 자동 판별되고, 결과에 이름이 들어갑니다.</p>
                 </div>
             </div>
 
@@ -72,7 +88,9 @@
             </div>
 
             <div>
-                <button id="btnProcess" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded transition-colors shadow-sm disabled:bg-gray-400" disabled>일괄 채점 시작</button>
+                <button id="btnProcess" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded transition-colors shadow-sm disabled:bg-gray-400" disabled>
+                    일괄 스캔 & 채점 시작
+                </button>
             </div>
 
             <div id="statusAlert" class="hidden bg-yellow-50 border-l-4 border-yellow-400 p-3 text-sm text-yellow-700">
@@ -82,21 +100,24 @@
 
             <div class="bg-gray-50 p-4 rounded-md border mt-auto flex-grow flex flex-col">
                 <h3 class="font-bold text-gray-700 mb-2 flex justify-between items-center">
-                    누적 채점 결과 (TSV)
+                    누적 채점 결과 (엑셀용)
                     <div class="space-x-1">
                         <button id="btnViewReports" class="hidden bg-purple-500 hover:bg-purple-600 text-white text-xs font-bold py-1 px-3 rounded transition-colors shadow-sm">📄 성적표 보기</button>
                         <button id="btnCopy" class="bg-green-500 hover:bg-green-600 text-white text-xs font-bold py-1 px-3 rounded transition-colors shadow-sm">📋 엑셀 복사</button>
                     </div>
                 </h3>
                 <textarea id="csvOutput" class="w-full flex-grow min-h-[80px] text-xs p-2 border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none whitespace-pre" readonly></textarea>
+                <p class="text-[10px] text-gray-400 mt-2">* 엑셀의 빈 A1 셀에 바로 붙여넣기(Ctrl+V) 하세요.</p>
             </div>
         </div>
 
+        <!-- 오른쪽 캔버스 영역 -->
         <div class="w-full md:w-2/3 flex flex-col">
             <div id="canvas-container"><canvas id="mainCanvas"></canvas></div>
         </div>
     </div>
 
+    <!-- 메일머지(개인별 성적표) 출력 화면 -->
     <div id="report-ui" class="hidden max-w-5xl mx-auto print-only">
         <div class="mb-4 no-print flex justify-between items-center bg-gray-800 text-white p-4 rounded-lg">
             <h2 class="text-lg font-bold">학생별 결과지 (메일머지) 미리보기</h2>
@@ -109,9 +130,11 @@
     </div>
 
     <script>
+        const subjectNameInput = document.getElementById('subjectName');
         const objCountInput = document.getElementById('objCount');
         const subjCountInput = document.getElementById('subjCount');
         const answerTable = document.getElementById('answerTable');
+        const rosterInput = document.getElementById('rosterInput');
         const imageUpload = document.getElementById('imageUpload');
         const mainCanvas = document.getElementById('mainCanvas');
         const ctx = mainCanvas.getContext('2d', { willReadFrequently: true });
@@ -131,6 +154,7 @@
         let globalProcessedImageData = null;
         let allStudentsData = []; 
 
+        // 1. 정답 표 렌더링
         function renderAnswerTable() {
             const objCount = parseInt(objCountInput.value) || 16;
             const subjCount = parseInt(subjCountInput.value) || 4;
@@ -139,10 +163,6 @@
             for(let i = 1; i <= objCount; i++) {
                 headerRow += `<th class="p-1 border-r border-blue-200 min-w-[28px] font-bold text-blue-800">${i}</th>`;
                 inputRow += `<td class="p-0 border-r border-gray-200"><input type="text" class="answer-input w-full p-1 text-center focus:bg-yellow-100 outline-none text-blue-700 font-bold" data-type="obj"></td>`;
-            }
-            for(let i = 1; i <= subjCount; i++) {
-                headerRow += `<th class="p-1 border-r border-blue-200 min-w-[28px] font-medium text-gray-500">주${i}</th>`;
-                inputRow += `<td class="p-0 border-r border-gray-200 bg-gray-50"><input type="text" class="w-full p-1 text-center bg-transparent outline-none text-gray-400 text-[10px]" value="OMR" readonly tabindex="-1"></td>`;
             }
             answerTable.innerHTML = headerRow + inputRow;
             document.querySelectorAll('.answer-input').forEach(input => {
@@ -166,7 +186,6 @@
         }
 
         objCountInput.addEventListener('change', renderAnswerTable);
-        subjCountInput.addEventListener('change', renderAnswerTable);
         document.getElementById('btnClearAnswers').addEventListener('click', () => { document.querySelectorAll('.answer-input').forEach(input => input.value = ''); });
         document.addEventListener('DOMContentLoaded', renderAnswerTable);
 
@@ -177,12 +196,27 @@
             btnProcess.disabled = false;
         });
 
+        // 2. 메인 처리 로직
         btnProcess.addEventListener('click', async () => {
             btnProcess.disabled = true; statusAlert.classList.remove('hidden');
             processingQueue = []; allStudentsData = [];
+            
             const answerInputs = document.querySelectorAll('.answer-input[data-type="obj"]');
             const answerKey = Array.from(answerInputs).map(input => parseInt(input.value)).map(n => isNaN(n) ? 0 : n);
             const hasAnswerKey = answerKey.some(n => n > 0);
+            const subjectName = subjectNameInput.value.trim() || '미지정 과목';
+
+            const rosterLines = rosterInput.value.trim().split(/\r?\n/);
+            const roster = [];
+            rosterLines.forEach(line => {
+                const parts = line.split('\t');
+                if(parts.length >= 3) {
+                    const c = parseInt(parts[0].replace(/[^0-9]/g, ''));
+                    const n = parseInt(parts[1].replace(/[^0-9]/g, ''));
+                    const name = parts[2].trim();
+                    if(!isNaN(c) && !isNaN(n) && name) roster.push({ c, n, name });
+                }
+            });
 
             try {
                 for (let file of selectedFiles) {
@@ -191,62 +225,127 @@
                 }
 
                 const totalPages = processingQueue.length;
-                let tsvData = [];
                 const objCount = parseInt(objCountInput.value) || 16;
                 const subjCount = parseInt(subjCountInput.value) || 4;
-                tsvData.push(['파일명', '학반', '번호', '객관식', '주관식', '총점'].join('\t'));
+                const startSubjNum = objCount + 1;
+
+                let scannedResultsMap = {}; 
 
                 for (let i = 0; i < totalPages; i++) {
                     const item = processingQueue[i];
+                    progressText.innerText = `스캔 분석 중... (${i+1}/${totalPages} 페이지)`;
+                    
                     mainCanvas.width = item.img.width; mainCanvas.height = item.img.height;
                     ctx.drawImage(item.img, 0, 0, mainCanvas.width, mainCanvas.height);
                     applyBinarization();
+                    
                     const rawData = performRealOMR(objCount, subjCount);
-                    const [fCls, fNum] = [rawData[0], rawData[1]];
+                    const fCls = rawData[0]; const fNum = rawData[1];
                     const objAns = rawData.slice(2, 2 + objCount);
                     const subSc = rawData.slice(2 + objCount);
 
-                    let objScore = 0; let objCorr = [];
+                    if(fCls > 0 && fNum > 0) {
+                        scannedResultsMap[`${fCls}-${fNum}`] = { objAns, subSc };
+                    }
+                    await new Promise(r => setTimeout(r, 50));
+                }
+
+                let tsvData = [];
+                tsvData.push(['학반', '번호', '이름', '과목명', '점수', '정오표', '틀린문항'].join('\t'));
+
+                if (roster.length > 0) {
+                    roster.forEach(student => {
+                        const key = `${student.c}-${student.n}`;
+                        const scanData = scannedResultsMap[key];
+
+                        if (scanData) {
+                            processAndPushStudentData(student.c, student.n, student.name, scanData.objAns, scanData.subSc);
+                            delete scannedResultsMap[key]; 
+                        } else {
+                            // 🌟 결시자의 경우 정오표를 25자리의 공백으로 채움 (수식 꼬임 방지)
+                            tsvData.push([student.c, student.n, student.name, subjectName, '결시', ' '.repeat(25), ''].join('\t'));
+                        }
+                    });
+                }
+
+                for (const key in scannedResultsMap) {
+                    const [c, n] = key.split('-').map(Number);
+                    const scanData = scannedResultsMap[key];
+                    processAndPushStudentData(c, n, roster.length > 0 ? "명부없음" : "", scanData.objAns, scanData.subSc);
+                }
+
+                function processAndPushStudentData(c, n, name, objAns, subSc) {
+                    let objScore = 0; let objCorr = []; let wrongNums = [];
                     if(hasAnswerKey) {
                         for(let q=0; q<objCount; q++) {
-                            if(objAns[q] === answerKey[q] && answerKey[q] !== 0) { objScore += 5; objCorr.push('O'); }
-                            else objCorr.push('X');
+                            if(objAns[q] === answerKey[q] && answerKey[q] !== 0) { 
+                                objScore += 5; objCorr.push('O'); 
+                            } else { 
+                                objCorr.push('X'); 
+                                wrongNums.push(q+1); 
+                            }
                         }
                     }
-                    const total = objScore + subSc.reduce((a,b)=>a+b, 0);
-                    tsvData.push([item.name, fCls, fNum, objScore, subSc.reduce((a,b)=>a+b, 0), total].join('\t'));
-                    allStudentsData.push({ classNum: fCls, studentNum: fNum, objAnswers: objAns, objCorrect: objCorr, subjScores: subSc, objScore, subjTotal: subSc.reduce((a,b)=>a+b,0), totalScore: total, objCount });
-                    csvOutput.value = tsvData.join('\n');
-                    await new Promise(r => setTimeout(r, 100));
+                    
+                    const subjTotal = subSc.reduce((a,b)=>a+b, 0);
+                    const totalScore = objScore + subjTotal;
+                    
+                    // 🌟 정오표 25자리 고정 로직 (모자란 글자 수 만큼 빈칸 채우기)
+                    let oxString = (hasAnswerKey ? objCorr.join('') : objAns.join('')) + subSc.join('');
+                    oxString = oxString.padEnd(25, ' '); 
+                    
+                    const wrongString = wrongNums.join(', ');
+
+                    tsvData.push([c, n, name, subjectName, totalScore, oxString, wrongString].join('\t'));
+                    
+                    allStudentsData.push({ 
+                        classNum: c, studentNum: n, name: name, subjectName: subjectName,
+                        objAnswers: objAns, objCorrect: objCorr, subjScores: subSc, 
+                        objScore, subjTotal, totalScore, objCount, startSubjNum
+                    });
                 }
+
+                csvOutput.value = tsvData.join('\n');
+                progressText.innerText = "채점 및 명부 매칭이 완료되었습니다!";
                 statusAlert.classList.replace('bg-yellow-50', 'bg-green-50');
                 if(hasAnswerKey) btnViewReports.classList.remove('hidden');
+
             } catch (e) { console.error(e); } finally { btnProcess.disabled = false; }
         });
 
+        // 3. 메일머지 렌더링
         btnViewReports.addEventListener('click', () => {
             mainUi.classList.add('hidden'); reportUi.classList.remove('hidden');
             reportContainer.innerHTML = allStudentsData.map(s => `
                 <div class="report-card p-6 border rounded-xl bg-white print:break-inside-avoid">
-                    <div class="border-b-2 border-gray-800 pb-2 mb-4 flex justify-between">
-                        <h3 class="text-xl font-bold">수학과 단원평가 분석 결과</h3>
-                        <div class="font-bold">${s.classNum}반 ${s.studentNum}번</div>
+                    <div class="border-b-2 border-gray-800 pb-2 mb-4 flex justify-between items-end">
+                        <h3 class="text-xl font-bold">${s.subjectName} 분석 결과</h3>
+                        <div class="text-lg font-bold">${s.classNum}반 ${s.studentNum}번 ${s.name ? `(${s.name})` : ''}</div>
                     </div>
                     <div class="flex justify-around bg-blue-50 p-4 rounded-lg mb-4">
                         <div class="text-center"><b>총점</b><br><span class="text-3xl font-black text-blue-900">${s.totalScore}점</span></div>
                     </div>
                     <div class="grid grid-cols-2 gap-4">
-                        <div><h4 class="font-bold text-sm bg-blue-100 p-1 mb-2">객관식</h4>
-                        ${s.objAnswers.map((a,i)=>`<div class="flex justify-between text-xs border-b"><span>${i+1}번</span><span>${a||'-'}</span><span>${s.objCorrect[i]}</span></div>`).join('')}
+                        <div><h4 class="font-bold text-sm bg-blue-100 p-1 mb-2 text-center">객관식</h4>
+                        ${s.objAnswers.map((a,i)=>`<div class="flex justify-between text-xs border-b"><span>${i+1}번</span><span>마킹:${a||'-'}</span><span class="font-bold ${s.objCorrect[i]==='O'?'text-blue-600':'text-red-500'}">${s.objCorrect[i]}</span></div>`).join('')}
                         </div>
-                        <div><h4 class="font-bold text-sm bg-purple-100 p-1 mb-2">주관식</h4>
-                        ${s.subjScores.map((sc,i)=>`<div class="flex justify-between text-xs border-b"><span>${s.objCount+i+1}번</span><span>${sc}점</span></div>`).join('')}
+                        <div><h4 class="font-bold text-sm bg-purple-100 p-1 mb-2 text-center">주관식</h4>
+                        ${s.subjScores.map((sc,i)=>`<div class="flex justify-between text-xs border-b"><span>${s.objCount+i+1}번</span><span class="font-bold text-purple-600">${sc}점</span></div>`).join('')}
                         </div>
                     </div>
                 </div>
             `).join('');
         });
 
+        document.getElementById('btnPrint').addEventListener('click', () => { window.print(); });
+        document.getElementById('btnBack').addEventListener('click', () => { reportUi.classList.add('hidden'); mainUi.classList.remove('hidden'); });
+        document.getElementById('btnCopy').addEventListener('click', () => {
+            csvOutput.select(); document.execCommand('copy');
+            const originalText = btnCopy.innerText; btnCopy.innerText = "✔️ 복사 완료!";
+            setTimeout(() => { btnCopy.innerText = originalText; }, 2000);
+        });
+
+        // OMR 엔진 
         async function loadPdfToImages(file) {
             const pdf = await pdfjsLib.getDocument(new Uint8Array(await file.arrayBuffer())).promise;
             for (let i = 1; i <= pdf.numPages; i++) {
@@ -260,7 +359,6 @@
                 processingQueue.push({ img, name: `${file.name}(p${i})` });
             }
         }
-
         function loadImageFile(file) {
             return new Promise(r => {
                 const reader = new FileReader();
@@ -272,7 +370,6 @@
                 reader.readAsDataURL(file);
             });
         }
-
         function applyBinarization() {
             const imgData = ctx.getImageData(0, 0, mainCanvas.width, mainCanvas.height);
             const data = imgData.data;
@@ -283,7 +380,6 @@
             }
             globalProcessedImageData = imgData;
         }
-
         function getRegions(w, h) {
             return {
                 classNum1: { x: w * 0.326, y: h * 0.116, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
@@ -298,7 +394,6 @@
                 subj20: { x: w * 0.590, y: h * 0.925, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }
             };
         }
-
         function calculateDarkness(x, y, w, h) {
             let black = 0; let total = w * h;
             x = Math.floor(x); y = Math.floor(y); w = Math.floor(w); h = Math.floor(h);
@@ -310,7 +405,6 @@
             }
             return black / total;
         }
-
         function scanGrid(startX, startY, width, height, rows, cols) {
             const res = []; const cW = width / cols; const cH = height / rows;
             for (let r = 0; r < rows; r++) {
@@ -325,7 +419,6 @@
             }
             return res;
         }
-
         function performRealOMR(oC, sC) {
             const r = getRegions(mainCanvas.width, mainCanvas.height);
             const c1 = scanGrid(r.classNum1.x, r.classNum1.y, r.classNum1.w, r.classNum1.h, 1, 1);
@@ -340,11 +433,6 @@
             const s19 = scanGrid(r.subj19.x, r.subj19.y, r.subj19.w, r.subj19.h, 1, 6);
             const s20 = scanGrid(r.subj20.x, r.subj20.y, r.subj20.w, r.subj20.h, 1, 6);
             return [cls, sn[0]+1, ...[...o1, ...o2].slice(0, oC).map(v=>v+1), ...[s17[0], s18[0], s19[0], s20[0]].slice(0, sC)];
-        }
-        function drawROIBoxes() {
-            const r = getRegions(mainCanvas.width, mainCanvas.height);
-            ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)';
-            for(let k in r) ctx.strokeRect(r[k].x, r[k].y, r[k].w, r[k].h);
         }
     </script>
 </body>
