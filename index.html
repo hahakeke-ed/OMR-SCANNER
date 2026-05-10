@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OMR 3단 분할 자동 채점기 & 메일머지</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+    </script>
+    <style>
+        body { font-family: 'Pretendard', sans-serif; background-color: #f3f4f6; }
+        #canvas-container { 
+            position: relative; width: 100%; height: 75vh; 
+            background-color: #e5e7eb; border: 1px solid #d1d5db; 
+            border-radius: 0.5rem; overflow-y: auto; overflow-x: hidden;
+        }
+        canvas { display: block; width: 100%; height: auto; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        
+        @media print {
+            body { background-color: white; padding: 0; }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            .report-card { 
+                page-break-inside: avoid; border: 2px solid #000;
+                margin-bottom: 20px; box-shadow: none;
+            }
+        }
+        
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    </style>
+</head>
+<body class="p-6">
+    <div id="main-ui" class="max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-6 flex flex-col md:flex-row gap-6 no-print">
+        <div class="w-full md:w-1/3 flex flex-col gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">OMR 자동 채점기</h1>
+                <p class="text-xs text-blue-600 mt-1 font-bold">✓ 일괄 스캔 + 엑셀 정답 붙여넣기 지원 + 메일머지</p>
+            </div>
+            
+            <div class="bg-blue-50 p-3 rounded-md border border-blue-100">
+                <h2 class="text-sm font-bold text-blue-800 mb-2">1. 시험 설정 및 정답 입력</h2>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700">객관식 문항 수</label>
+                        <input type="number" id="objCount" value="16" min="1" max="20" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700">주관식 문항 수</label>
+                        <input type="number" id="subjCount" value="4" min="0" max="4" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-end mb-1">
+                        <label class="block text-xs font-medium text-gray-700">객관식 정답 표 (엑셀 붙여넣기 지원)</label>
+                        <button id="btnClearAnswers" class="text-[10px] text-gray-600 bg-gray-200 hover:bg-gray-300 transition px-2 py-0.5 rounded">전체 지우기</button>
+                    </div>
+                    <div class="overflow-x-auto border border-gray-300 rounded bg-white">
+                        <table class="w-full text-center text-xs whitespace-nowrap" id="answerTable"></table>
+                    </div>
+                    <p class="text-[10px] text-gray-500 mt-1">* 엑셀의 정답 데이터를 복사하여 표를 클릭 후 <b>[Ctrl + V]</b> 하세요.</p>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">2. 시험지 업로드 (이미지/PDF 다중선택)</label>
+                <input type="file" id="imageUpload" accept="image/*, application/pdf" multiple class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 border rounded-md transition">
+                <div id="fileList" class="mt-2 text-xs text-gray-600 space-y-1 max-h-16 overflow-y-auto"></div>
+            </div>
+
+            <div>
+                <button id="btnProcess" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded transition-colors shadow-sm disabled:bg-gray-400" disabled>일괄 채점 시작</button>
+            </div>
+
+            <div id="statusAlert" class="hidden bg-yellow-50 border-l-4 border-yellow-400 p-3 text-sm text-yellow-700">
+                <p class="font-bold">처리 중입니다...</p>
+                <p id="progressText">준비 중...</p>
+            </div>
+
+            <div class="bg-gray-50 p-4 rounded-md border mt-auto flex-grow flex flex-col">
+                <h3 class="font-bold text-gray-700 mb-2 flex justify-between items-center">
+                    누적 채점 결과 (TSV)
+                    <div class="space-x-1">
+                        <button id="btnViewReports" class="hidden bg-purple-500 hover:bg-purple-600 text-white text-xs font-bold py-1 px-3 rounded transition-colors shadow-sm">📄 성적표 보기</button>
+                        <button id="btnCopy" class="bg-green-500 hover:bg-green-600 text-white text-xs font-bold py-1 px-3 rounded transition-colors shadow-sm">📋 엑셀 복사</button>
+                    </div>
+                </h3>
+                <textarea id="csvOutput" class="w-full flex-grow min-h-[80px] text-xs p-2 border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none whitespace-pre" readonly></textarea>
+            </div>
+        </div>
+
+        <div class="w-full md:w-2/3 flex flex-col">
+            <div id="canvas-container"><canvas id="mainCanvas"></canvas></div>
+        </div>
+    </div>
+
+    <div id="report-ui" class="hidden max-w-5xl mx-auto print-only">
+        <div class="mb-4 no-print flex justify-between items-center bg-gray-800 text-white p-4 rounded-lg">
+            <h2 class="text-lg font-bold">학생별 결과지 (메일머지) 미리보기</h2>
+            <div class="space-x-2">
+                <button id="btnPrint" class="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded font-bold">🖨️ 인쇄하기 (A4)</button>
+                <button id="btnBack" class="bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded font-bold">돌아가기</button>
+            </div>
+        </div>
+        <div id="reportContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white print:grid-cols-2 print:gap-4 print:p-0"></div>
+    </div>
+
+    <script>
+        const objCountInput = document.getElementById('objCount');
+        const subjCountInput = document.getElementById('subjCount');
+        const answerTable = document.getElementById('answerTable');
+        const imageUpload = document.getElementById('imageUpload');
+        const mainCanvas = document.getElementById('mainCanvas');
+        const ctx = mainCanvas.getContext('2d', { willReadFrequently: true });
+        const btnProcess = document.getElementById('btnProcess');
+        const fileListDiv = document.getElementById('fileList');
+        const csvOutput = document.getElementById('csvOutput');
+        const btnCopy = document.getElementById('btnCopy');
+        const statusAlert = document.getElementById('statusAlert');
+        const progressText = document.getElementById('progressText');
+        const btnViewReports = document.getElementById('btnViewReports');
+        const mainUi = document.getElementById('main-ui');
+        const reportUi = document.getElementById('report-ui');
+        const reportContainer = document.getElementById('reportContainer');
+
+        let selectedFiles = [];
+        let processingQueue = []; 
+        let globalProcessedImageData = null;
+        let allStudentsData = []; 
+
+        function renderAnswerTable() {
+            const objCount = parseInt(objCountInput.value) || 16;
+            const subjCount = parseInt(subjCountInput.value) || 4;
+            let headerRow = `<tr class="bg-blue-100 border-b border-blue-200">`;
+            let inputRow = `<tr>`;
+            for(let i = 1; i <= objCount; i++) {
+                headerRow += `<th class="p-1 border-r border-blue-200 min-w-[28px] font-bold text-blue-800">${i}</th>`;
+                inputRow += `<td class="p-0 border-r border-gray-200"><input type="text" class="answer-input w-full p-1 text-center focus:bg-yellow-100 outline-none text-blue-700 font-bold" data-type="obj"></td>`;
+            }
+            for(let i = 1; i <= subjCount; i++) {
+                headerRow += `<th class="p-1 border-r border-blue-200 min-w-[28px] font-medium text-gray-500">주${i}</th>`;
+                inputRow += `<td class="p-0 border-r border-gray-200 bg-gray-50"><input type="text" class="w-full p-1 text-center bg-transparent outline-none text-gray-400 text-[10px]" value="OMR" readonly tabindex="-1"></td>`;
+            }
+            answerTable.innerHTML = headerRow + inputRow;
+            document.querySelectorAll('.answer-input').forEach(input => {
+                input.addEventListener('paste', handleExcelPaste);
+                input.addEventListener('input', function() { this.value = this.value.replace(/[^1-5]/g, '').slice(0, 1); });
+            });
+        }
+
+        function handleExcelPaste(e) {
+            e.preventDefault();
+            let pasteData = (e.clipboardData || window.clipboardData).getData('text');
+            const rows = pasteData.trim().split(/\r\n|\n|\r/);
+            let targetRow = rows.length > 1 ? rows[rows.length - 1] : rows[0]; 
+            let values = targetRow.split('\t');
+            if (values.length > 0 && isNaN(parseInt(values[0]))) values.shift(); 
+            const inputs = document.querySelectorAll('.answer-input[data-type="obj"]');
+            for(let i = 0; i < Math.min(values.length, inputs.length); i++) {
+                let val = values[i].trim().replace(/[^1-5]/g, '').slice(0, 1);
+                if (val) inputs[i].value = val;
+            }
+        }
+
+        objCountInput.addEventListener('change', renderAnswerTable);
+        subjCountInput.addEventListener('change', renderAnswerTable);
+        document.getElementById('btnClearAnswers').addEventListener('click', () => { document.querySelectorAll('.answer-input').forEach(input => input.value = ''); });
+        document.addEventListener('DOMContentLoaded', renderAnswerTable);
+
+        imageUpload.addEventListener('change', (e) => {
+            selectedFiles = Array.from(e.target.files);
+            if (selectedFiles.length === 0) { btnProcess.disabled = true; return; }
+            fileListDiv.innerHTML = selectedFiles.map(f => `<div class="truncate">${f.type === 'application/pdf' ? '📑' : '🖼️'} ${f.name}</div>`).join('');
+            btnProcess.disabled = false;
+        });
+
+        btnProcess.addEventListener('click', async () => {
+            btnProcess.disabled = true; statusAlert.classList.remove('hidden');
+            processingQueue = []; allStudentsData = [];
+            const answerInputs = document.querySelectorAll('.answer-input[data-type="obj"]');
+            const answerKey = Array.from(answerInputs).map(input => parseInt(input.value)).map(n => isNaN(n) ? 0 : n);
+            const hasAnswerKey = answerKey.some(n => n > 0);
+
+            try {
+                for (let file of selectedFiles) {
+                    if (file.type === 'application/pdf') await loadPdfToImages(file);
+                    else await loadImageFile(file);
+                }
+
+                const totalPages = processingQueue.length;
+                let tsvData = [];
+                const objCount = parseInt(objCountInput.value) || 16;
+                const subjCount = parseInt(subjCountInput.value) || 4;
+                tsvData.push(['파일명', '학반', '번호', '객관식', '주관식', '총점'].join('\t'));
+
+                for (let i = 0; i < totalPages; i++) {
+                    const item = processingQueue[i];
+                    mainCanvas.width = item.img.width; mainCanvas.height = item.img.height;
+                    ctx.drawImage(item.img, 0, 0, mainCanvas.width, mainCanvas.height);
+                    applyBinarization();
+                    const rawData = performRealOMR(objCount, subjCount);
+                    const [fCls, fNum] = [rawData[0], rawData[1]];
+                    const objAns = rawData.slice(2, 2 + objCount);
+                    const subSc = rawData.slice(2 + objCount);
+
+                    let objScore = 0; let objCorr = [];
+                    if(hasAnswerKey) {
+                        for(let q=0; q<objCount; q++) {
+                            if(objAns[q] === answerKey[q] && answerKey[q] !== 0) { objScore += 5; objCorr.push('O'); }
+                            else objCorr.push('X');
+                        }
+                    }
+                    const total = objScore + subSc.reduce((a,b)=>a+b, 0);
+                    tsvData.push([item.name, fCls, fNum, objScore, subSc.reduce((a,b)=>a+b, 0), total].join('\t'));
+                    allStudentsData.push({ classNum: fCls, studentNum: fNum, objAnswers: objAns, objCorrect: objCorr, subjScores: subSc, objScore, subjTotal: subSc.reduce((a,b)=>a+b,0), totalScore: total, objCount });
+                    csvOutput.value = tsvData.join('\n');
+                    await new Promise(r => setTimeout(r, 100));
+                }
+                statusAlert.classList.replace('bg-yellow-50', 'bg-green-50');
+                if(hasAnswerKey) btnViewReports.classList.remove('hidden');
+            } catch (e) { console.error(e); } finally { btnProcess.disabled = false; }
+        });
+
+        btnViewReports.addEventListener('click', () => {
+            mainUi.classList.add('hidden'); reportUi.classList.remove('hidden');
+            reportContainer.innerHTML = allStudentsData.map(s => `
+                <div class="report-card p-6 border rounded-xl bg-white print:break-inside-avoid">
+                    <div class="border-b-2 border-gray-800 pb-2 mb-4 flex justify-between">
+                        <h3 class="text-xl font-bold">수학과 단원평가 분석 결과</h3>
+                        <div class="font-bold">${s.classNum}반 ${s.studentNum}번</div>
+                    </div>
+                    <div class="flex justify-around bg-blue-50 p-4 rounded-lg mb-4">
+                        <div class="text-center"><b>총점</b><br><span class="text-3xl font-black text-blue-900">${s.totalScore}점</span></div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><h4 class="font-bold text-sm bg-blue-100 p-1 mb-2">객관식</h4>
+                        ${s.objAnswers.map((a,i)=>`<div class="flex justify-between text-xs border-b"><span>${i+1}번</span><span>${a||'-'}</span><span>${s.objCorrect[i]}</span></div>`).join('')}
+                        </div>
+                        <div><h4 class="font-bold text-sm bg-purple-100 p-1 mb-2">주관식</h4>
+                        ${s.subjScores.map((sc,i)=>`<div class="flex justify-between text-xs border-b"><span>${s.objCount+i+1}번</span><span>${sc}점</span></div>`).join('')}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        });
+
+        async function loadPdfToImages(file) {
+            const pdf = await pdfjsLib.getDocument(new Uint8Array(await file.arrayBuffer())).promise;
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const viewport = page.getViewport({ scale: 2.0 });
+                const canvas = document.createElement('canvas');
+                canvas.height = viewport.height; canvas.width = viewport.width;
+                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                const img = new Image(); img.src = canvas.toDataURL('image/jpeg');
+                await new Promise(r => img.onload = r);
+                processingQueue.push({ img, name: `${file.name}(p${i})` });
+            }
+        }
+
+        function loadImageFile(file) {
+            return new Promise(r => {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const img = new Image();
+                    img.onload = () => { processingQueue.push({ img, name: file.name }); r(); };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function applyBinarization() {
+            const imgData = ctx.getImageData(0, 0, mainCanvas.width, mainCanvas.height);
+            const data = imgData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                const b = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+                const c = b < 130 ? 0 : 255;
+                data[i] = data[i+1] = data[i+2] = c;
+            }
+            globalProcessedImageData = imgData;
+        }
+
+        function getRegions(w, h) {
+            return {
+                classNum1: { x: w * 0.326, y: h * 0.116, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
+                classNum2: { x: w * 0.400, y: h * 0.116, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
+                classNum3: { x: w * 0.463, y: h * 0.114, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
+                studentNum: { x: w * 0.198, y: h * 0.143, w: w * 0.718, h: h * 0.022, r: 1, c: 29 }, 
+                obj1: { x: w * 0.158, y: h * 0.228, w: w * 0.258, h: h * 0.352, r: 10, c: 5 },
+                obj2: { x: w * 0.615, y: h * 0.228, w: w * 0.258, h: h * 0.352, r: 10, c: 5 }, 
+                subj17: { x: w * 0.145, y: h * 0.755, w: w * 0.298, h: h * 0.025, r: 1, c: 6 },
+                subj18: { x: w * 0.590, y: h * 0.755, w: w * 0.298, h: h * 0.025, r: 1, c: 6 },
+                subj19: { x: w * 0.145, y: h * 0.925, w: w * 0.298, h: h * 0.025, r: 1, c: 6 },
+                subj20: { x: w * 0.590, y: h * 0.925, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }
+            };
+        }
+
+        function calculateDarkness(x, y, w, h) {
+            let black = 0; let total = w * h;
+            x = Math.floor(x); y = Math.floor(y); w = Math.floor(w); h = Math.floor(h);
+            for (let row = 0; row < h; row++) {
+                for (let col = 0; col < w; col++) {
+                    const idx = ((y + row) * mainCanvas.width + (x + col)) * 4;
+                    if (globalProcessedImageData.data[idx] < 128) black++;
+                }
+            }
+            return black / total;
+        }
+
+        function scanGrid(startX, startY, width, height, rows, cols) {
+            const res = []; const cW = width / cols; const cH = height / rows;
+            for (let r = 0; r < rows; r++) {
+                let maxD = 0; let bestC = -1;
+                for (let c = 0; c < cols; c++) {
+                    const sX = startX + c * cW + cW * 0.125; const sY = startY + r * cH + cH * 0.125;
+                    const sW = cW * 0.75; const sH = cH * 0.75;
+                    const d = calculateDarkness(sX, sY, sW, sH);
+                    if (d > maxD) { maxD = d; bestC = c; }
+                }
+                res.push(maxD < 0.10 ? -1 : bestC);
+            }
+            return res;
+        }
+
+        function performRealOMR(oC, sC) {
+            const r = getRegions(mainCanvas.width, mainCanvas.height);
+            const c1 = scanGrid(r.classNum1.x, r.classNum1.y, r.classNum1.w, r.classNum1.h, 1, 1);
+            const c2 = scanGrid(r.classNum2.x, r.classNum2.y, r.classNum2.w, r.classNum2.h, 1, 1);
+            const c3 = scanGrid(r.classNum3.x, r.classNum3.y, r.classNum3.w, r.classNum3.h, 1, 1);
+            let cls = c1[0]!==-1?1:c2[0]!==-1?2:c3[0]!==-1?3:0;
+            const sn = scanGrid(r.studentNum.x, r.studentNum.y, r.studentNum.w, r.studentNum.h, 1, 29);
+            const o1 = scanGrid(r.obj1.x, r.obj1.y, r.obj1.w, r.obj1.h, 10, 5);
+            const o2 = scanGrid(r.obj2.x, r.obj2.y, r.obj2.w, r.obj2.h, 10, 5);
+            const s17 = scanGrid(r.subj17.x, r.subj17.y, r.subj17.w, r.subj17.h, 1, 6);
+            const s18 = scanGrid(r.subj18.x, r.subj18.y, r.subj18.w, r.subj18.h, 1, 6);
+            const s19 = scanGrid(r.subj19.x, r.subj19.y, r.subj19.w, r.subj19.h, 1, 6);
+            const s20 = scanGrid(r.subj20.x, r.subj20.y, r.subj20.w, r.subj20.h, 1, 6);
+            return [cls, sn[0]+1, ...[...o1, ...o2].slice(0, oC).map(v=>v+1), ...[s17[0], s18[0], s19[0], s20[0]].slice(0, sC)];
+        }
+        function drawROIBoxes() {
+            const r = getRegions(mainCanvas.width, mainCanvas.height);
+            ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)';
+            for(let k in r) ctx.strokeRect(r[k].x, r[k].y, r[k].w, r[k].h);
+        }
+    </script>
+</body>
+</html>
