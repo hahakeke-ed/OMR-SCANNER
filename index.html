@@ -287,11 +287,22 @@
                         }
                     }
                     
+                    // 🌟 주관식 채점 로직 추가: 0점 초과면 'O', 0점이면 'X' 처리 및 틀린 번호 기록
+                    let subjCorr = [];
+                    for(let i=0; i<subSc.length; i++) {
+                        if(subSc[i] > 0) {
+                            subjCorr.push('O');
+                        } else {
+                            subjCorr.push('X');
+                            wrongNums.push(startSubjNum + i);
+                        }
+                    }
+                    
                     const subjTotal = subSc.reduce((a,b)=>a+b, 0);
                     const totalScore = objScore + subjTotal;
                     
-                    // 🌟 정오표 25자리 고정 로직 (모자란 글자 수 만큼 빈칸 채우기)
-                    let oxString = (hasAnswerKey ? objCorr.join('') : objAns.join('')) + subSc.join('');
+                    // 🌟 정오표 25자리 고정 로직 (주관식도 O/X로 합침)
+                    let oxString = (hasAnswerKey ? objCorr.join('') : objAns.join('')) + subjCorr.join('');
                     oxString = oxString.padEnd(25, ' '); 
                     
                     const wrongString = wrongNums.join(', ');
@@ -300,7 +311,7 @@
                     
                     allStudentsData.push({ 
                         classNum: c, studentNum: n, name: name, subjectName: subjectName,
-                        objAnswers: objAns, objCorrect: objCorr, subjScores: subSc, 
+                        objAnswers: objAns, objCorrect: objCorr, subjScores: subSc, subjCorrect: subjCorr,
                         objScore, subjTotal, totalScore, objCount, startSubjNum
                     });
                 }
