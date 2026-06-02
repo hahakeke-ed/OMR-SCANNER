@@ -434,35 +434,34 @@
             globalProcessedImageData = imgData;
         }
 
-        // 🌟 25문항 양식 좌표 2차 정밀 보정 (선생님 피드백 완벽 반영)
+        // 🌟 25문항 양식 좌표 정밀 보정 (선생님 피드백 반영 완료)
         function getRegions(w, h, type) {
             if (type === '25q') {
                 return {
-                    // 1. 학반 박스 : 상향, 우측으로 이동
-                    classNum1: { x: w * 0.330, y: h * 0.116, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
-                    classNum2: { x: w * 0.402, y: h * 0.116, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
-                    classNum3: { x: w * 0.472, y: h * 0.116, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
+                    // 1. 학반 박스 : 상향(y 감소), 우측 이동(x 증가)
+                    classNum1: { x: w * 0.334, y: h * 0.113, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
+                    classNum2: { x: w * 0.406, y: h * 0.113, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
+                    classNum3: { x: w * 0.476, y: h * 0.113, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
                     
-                    // 2, 3. 번호 박스 : 약간 상향, 우측으로 이동
-                    studentNum: { x: w * 0.203, y: h * 0.145, w: w * 0.718, h: h * 0.022, r: 1, c: 29 }, 
+                    // 2. 번호 박스 : 상향, 우측 이동
+                    studentNum: { x: w * 0.207, y: h * 0.141, w: w * 0.718, h: h * 0.022, r: 1, c: 29 }, 
                     
-                    // 객관식 1~20번은 기존 유지 (잘 맞음)
-                    obj1: { x: w * 0.158, y: h * 0.235, w: w * 0.258, h: h * 0.355, r: 10, c: 5 }, // 왼쪽 1~10번
-                    obj2: { x: w * 0.615, y: h * 0.235, w: w * 0.258, h: h * 0.355, r: 10, c: 5 }, // 오른쪽 11~20번
+                    // 3. 객관식 1~10번 : 우측으로 이동
+                    obj1: { x: w * 0.162, y: h * 0.235, w: w * 0.258, h: h * 0.355, r: 10, c: 5 }, 
+                    // 4 & 5. 객관식 11~21번 : 정상 위치, 11줄로 한 번에 처리
+                    obj2: { x: w * 0.615, y: h * 0.235, w: w * 0.258, h: h * 0.390, r: 11, c: 5 }, 
                     
-                    // 4. 객관식 21번 : 20번 아래에 위치하도록 우측 하단으로 이동
-                    obj3: { x: w * 0.615, y: h * 0.598, w: w * 0.258, h: h * 0.035, r: 1, c: 5 },  // 21번 단독
-                    
-                    // 주관식 영역
-                    subj22: { x: w * 0.145, y: h * 0.770, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }, // 22번 (유지)
-                    // 5. 주관식 23번 : 우측으로 이동, 미세하게 하향
-                    subj23: { x: w * 0.595, y: h * 0.772, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }, // 23번
-                    // 6. 주관식 24, 25번 : 상향으로 1칸, 우측으로 미세하게 이동
-                    subj24: { x: w * 0.148, y: h * 0.925, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }, // 24번
-                    subj25: { x: w * 0.595, y: h * 0.925, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }  // 25번
+                    // 6. 주관식 22번 : 하향
+                    subj22: { x: w * 0.145, y: h * 0.785, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }, 
+                    // 7. 주관식 23번 : 하향, 우측으로 조금 이동
+                    subj23: { x: w * 0.600, y: h * 0.785, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }, 
+                    // 주관식 24, 25번 : (이전 보정값 유지)
+                    subj24: { x: w * 0.148, y: h * 0.925, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }, 
+                    subj25: { x: w * 0.595, y: h * 0.925, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }  
                 };
             }
             
+            // 기존 완벽 세팅된 20문항 양식
             return {
                 classNum1: { x: w * 0.326, y: h * 0.118, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
                 classNum2: { x: w * 0.400, y: h * 0.118, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
@@ -516,17 +515,16 @@
             
             if (currentType === '25q') {
                 const o1 = scanGrid(r.obj1.x, r.obj1.y, r.obj1.w, r.obj1.h, 10, 5); 
-                const o2 = scanGrid(r.obj2.x, r.obj2.y, r.obj2.w, r.obj2.h, 10, 5); 
-                // 🌟 21번 단독 분석
-                const o3 = scanGrid(r.obj3.x, r.obj3.y, r.obj3.w, r.obj3.h, 1, 5); 
+                // 🌟 11~21번(11개 문항)을 한 번에 스캔하도록 수정됨
+                const o2 = scanGrid(r.obj2.x, r.obj2.y, r.obj2.w, r.obj2.h, 11, 5); 
                 
                 const s22 = scanGrid(r.subj22.x, r.subj22.y, r.subj22.w, r.subj22.h, 1, 6);
                 const s23 = scanGrid(r.subj23.x, r.subj23.y, r.subj23.w, r.subj23.h, 1, 6);
                 const s24 = scanGrid(r.subj24.x, r.subj24.y, r.subj24.w, r.subj24.h, 1, 6);
                 const s25 = scanGrid(r.subj25.x, r.subj25.y, r.subj25.w, r.subj25.h, 1, 6);
                 
-                // 1~21번까지 합치기
-                const allObj = [...o1, ...o2, ...o3].slice(0, oC).map(v=>v+1);
+                // 1~21번까지 합치기 (o3 제거)
+                const allObj = [...o1, ...o2].slice(0, oC).map(v=>v+1);
                 const allSubj = [s22[0], s23[0], s24[0], s25[0]].slice(0, sC);
                 
                 return [cls, sn[0]+1, ...allObj, ...allSubj];
