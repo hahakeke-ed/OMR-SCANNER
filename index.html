@@ -4,46 +4,81 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OMR 자동 채점 & 명부 연동 시스템</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
     </script>
+
     <style>
-        body { font-family: 'Pretendard', sans-serif; background-color: #f3f4f6; }
-        #canvas-container { 
-            position: relative; width: 100%; height: 75vh; 
-            background-color: #e5e7eb; border: 1px solid #d1d5db; 
-            border-radius: 0.5rem; overflow-y: auto; overflow-x: hidden;
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: #f3f4f6;
         }
-        canvas { display: block; width: 100%; height: auto; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
-        
+
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            height: 75vh;
+            background-color: #e5e7eb;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
         @media print {
-            body { background-color: white; padding: 0; }
-            .no-print { display: none !important; }
-            .print-only { display: block !important; }
-            .report-card { 
-                page-break-inside: avoid; border: 2px solid #000;
-                margin-bottom: 20px; box-shadow: none;
+            body {
+                background-color: white;
+                padding: 0;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            .print-only {
+                display: block !important;
+            }
+
+            .report-card {
+                page-break-inside: avoid;
+                break-inside: avoid;
+                border: 2px solid #000;
+                margin-bottom: 20px;
+                box-shadow: none;
             }
         }
-        input[type=number]::-webkit-inner-spin-button, 
-        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
     </style>
 </head>
+
 <body class="p-6">
     <div id="main-ui" class="max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-6 flex flex-col md:flex-row gap-6 no-print">
-        
+
         <!-- 왼쪽 컨트롤 패널 -->
         <div class="w-full md:w-1/3 flex flex-col gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-gray-800">OMR 자동 채점기</h1>
                 <p class="text-xs text-blue-600 mt-1 font-bold">✓ 명부 연동 + 결시 처리 + 엑셀 정오표(25자리) + 메일머지</p>
             </div>
-            
+
             <div class="bg-blue-50 p-3 rounded-md border border-blue-100 flex flex-col gap-3">
                 <h2 class="text-sm font-bold text-blue-800">1. 시험 기본 설정</h2>
-                
+
                 <div class="flex gap-2">
                     <div class="flex-grow">
                         <label class="block text-xs font-medium text-gray-700">과목/시험명</label>
@@ -51,7 +86,6 @@
                     </div>
                 </div>
 
-                <!-- 🌟 OMR 양식 선택 드롭다운 -->
                 <div>
                     <label class="block text-xs font-medium text-gray-700">OMR 양식 템플릿 선택</label>
                     <select id="formType" class="mt-1 w-full border border-blue-400 rounded p-1.5 text-sm font-bold text-blue-700 bg-blue-50 focus:outline-none">
@@ -76,6 +110,7 @@
                         <label class="block text-xs font-medium text-gray-700">객관식 정답 표 (엑셀 붙여넣기)</label>
                         <button id="btnClearAnswers" class="text-[10px] text-gray-600 bg-gray-200 hover:bg-gray-300 transition px-2 py-0.5 rounded">지우기</button>
                     </div>
+
                     <div class="overflow-x-auto border border-gray-300 rounded bg-white">
                         <table class="w-full text-center text-xs whitespace-nowrap" id="answerTable"></table>
                     </div>
@@ -115,6 +150,7 @@
                         <button id="btnCopy" class="bg-green-500 hover:bg-green-600 text-white text-xs font-bold py-1 px-3 rounded transition-colors shadow-sm">📋 엑셀 복사</button>
                     </div>
                 </h3>
+
                 <textarea id="csvOutput" class="w-full flex-grow min-h-[80px] text-xs p-2 border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none whitespace-pre" readonly></textarea>
                 <p class="text-[10px] text-gray-400 mt-2">* 엑셀의 빈 A1 셀에 바로 붙여넣기(Ctrl+V) 하세요.</p>
             </div>
@@ -122,7 +158,9 @@
 
         <!-- 오른쪽 캔버스 영역 -->
         <div class="w-full md:w-2/3 flex flex-col">
-            <div id="canvas-container"><canvas id="mainCanvas"></canvas></div>
+            <div id="canvas-container">
+                <canvas id="mainCanvas"></canvas>
+            </div>
         </div>
     </div>
 
@@ -135,6 +173,7 @@
                 <button id="btnBack" class="bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded font-bold">돌아가기</button>
             </div>
         </div>
+
         <div id="reportContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white print:grid-cols-2 print:gap-4 print:p-0"></div>
     </div>
 
@@ -160,36 +199,60 @@
         const formTypeSelect = document.getElementById('formType');
 
         let selectedFiles = [];
-        let processingQueue = []; 
+        let processingQueue = [];
         let globalProcessedImageData = null;
-        let allStudentsData = []; 
+        let allStudentsData = [];
         let originalImage = null;
+
+        function escapeHTML(str) {
+            return String(str || '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
 
         function renderAnswerTable() {
             const objCount = parseInt(objCountInput.value) || 16;
-            const subjCount = parseInt(subjCountInput.value) || 4;
+
             let headerRow = `<tr class="bg-blue-100 border-b border-blue-200">`;
             let inputRow = `<tr>`;
-            for(let i = 1; i <= objCount; i++) {
+
+            for (let i = 1; i <= objCount; i++) {
                 headerRow += `<th class="p-1 border-r border-blue-200 min-w-[28px] font-bold text-blue-800">${i}</th>`;
                 inputRow += `<td class="p-0 border-r border-gray-200"><input type="text" class="answer-input w-full p-1 text-center focus:bg-yellow-100 outline-none text-blue-700 font-bold" data-type="obj"></td>`;
             }
+
+            headerRow += `</tr>`;
+            inputRow += `</tr>`;
+
             answerTable.innerHTML = headerRow + inputRow;
+
             document.querySelectorAll('.answer-input').forEach(input => {
                 input.addEventListener('paste', handleExcelPaste);
-                input.addEventListener('input', function() { this.value = this.value.replace(/[^1-5]/g, '').slice(0, 1); });
+                input.addEventListener('input', function () {
+                    this.value = this.value.replace(/[^1-5]/g, '').slice(0, 1);
+                });
             });
         }
 
         function handleExcelPaste(e) {
             e.preventDefault();
+
             let pasteData = (e.clipboardData || window.clipboardData).getData('text');
             const rows = pasteData.trim().split(/\r\n|\n|\r/);
-            let targetRow = rows.length > 1 ? rows[rows.length - 1] : rows[0]; 
+
+            let targetRow = rows.length > 1 ? rows[rows.length - 1] : rows[0];
             let values = targetRow.split('\t');
-            if (values.length > 0 && isNaN(parseInt(values[0]))) values.shift(); 
+
+            if (values.length > 0 && isNaN(parseInt(values[0]))) {
+                values.shift();
+            }
+
             const inputs = document.querySelectorAll('.answer-input[data-type="obj"]');
-            for(let i = 0; i < Math.min(values.length, inputs.length); i++) {
+
+            for (let i = 0; i < Math.min(values.length, inputs.length); i++) {
                 let val = values[i].trim().replace(/[^1-5]/g, '').slice(0, 1);
                 if (val) inputs[i].value = val;
             }
@@ -203,66 +266,112 @@
                 objCountInput.value = 21;
                 subjCountInput.value = 4;
             }
+
             renderAnswerTable();
-            
+
             if (originalImage) {
+                globalProcessedImageData = null;
+                mainCanvas.width = originalImage.width;
+                mainCanvas.height = originalImage.height;
                 ctx.drawImage(originalImage, 0, 0, mainCanvas.width, mainCanvas.height);
                 drawROIBoxes();
             }
         });
 
         objCountInput.addEventListener('change', renderAnswerTable);
-        document.getElementById('btnClearAnswers').addEventListener('click', () => { document.querySelectorAll('.answer-input').forEach(input => input.value = ''); });
+
+        document.getElementById('btnClearAnswers').addEventListener('click', () => {
+            document.querySelectorAll('.answer-input').forEach(input => input.value = '');
+        });
+
         document.addEventListener('DOMContentLoaded', renderAnswerTable);
 
         imageUpload.addEventListener('change', async (e) => {
             selectedFiles = Array.from(e.target.files);
-            if (selectedFiles.length === 0) { btnProcess.disabled = true; return; }
-            fileListDiv.innerHTML = selectedFiles.map(f => `<div class="truncate">${f.type === 'application/pdf' ? '📑' : '🖼️'} ${f.name}</div>`).join('');
+
+            if (selectedFiles.length === 0) {
+                btnProcess.disabled = true;
+                return;
+            }
+
+            fileListDiv.innerHTML = selectedFiles.map(f => {
+                return `<div class="truncate">${f.type === 'application/pdf' ? '📑' : '🖼️'} ${escapeHTML(f.name)}</div>`;
+            }).join('');
+
             btnProcess.disabled = false;
 
             const file = selectedFiles[0];
+
             if (file.type.startsWith('image/')) {
                 const reader = new FileReader();
+
                 reader.onload = (event) => {
                     originalImage = new Image();
+
                     originalImage.onload = () => {
+                        globalProcessedImageData = null;
                         mainCanvas.width = originalImage.width;
                         mainCanvas.height = originalImage.height;
                         ctx.drawImage(originalImage, 0, 0, mainCanvas.width, mainCanvas.height);
-                        drawROIBoxes(); 
+                        drawROIBoxes();
                     };
+
                     originalImage.src = event.target.result;
                 };
+
                 reader.readAsDataURL(file);
+            } else {
+                originalImage = null;
+                globalProcessedImageData = null;
             }
         });
 
         btnProcess.addEventListener('click', async () => {
-            btnProcess.disabled = true; statusAlert.classList.remove('hidden');
-            processingQueue = []; allStudentsData = [];
-            
+            btnProcess.disabled = true;
+            statusAlert.classList.remove('hidden');
+
+            statusAlert.classList.remove('bg-green-50', 'border-green-400', 'text-green-700', 'bg-red-50', 'border-red-400', 'text-red-700');
+            statusAlert.classList.add('bg-yellow-50', 'border-yellow-400', 'text-yellow-700');
+
+            progressText.innerText = '준비 중...';
+
+            processingQueue = [];
+            allStudentsData = [];
+            csvOutput.value = '';
+            btnViewReports.classList.add('hidden');
+
             const answerInputs = document.querySelectorAll('.answer-input[data-type="obj"]');
-            const answerKey = Array.from(answerInputs).map(input => parseInt(input.value)).map(n => isNaN(n) ? 0 : n);
+            const answerKey = Array.from(answerInputs)
+                .map(input => parseInt(input.value))
+                .map(n => isNaN(n) ? 0 : n);
+
             const hasAnswerKey = answerKey.some(n => n > 0);
             const subjectName = subjectNameInput.value.trim() || '미지정 과목';
 
             const rosterLines = rosterInput.value.trim().split(/\r?\n/);
             const roster = [];
+
             rosterLines.forEach(line => {
                 const parts = line.split('\t');
-                if(parts.length >= 3) {
+
+                if (parts.length >= 3) {
                     const c = parseInt(parts[0].replace(/[^0-9]/g, ''));
                     const n = parseInt(parts[1].replace(/[^0-9]/g, ''));
                     const name = parts[2].trim();
-                    if(!isNaN(c) && !isNaN(n) && name) roster.push({ c, n, name });
+
+                    if (!isNaN(c) && !isNaN(n) && name) {
+                        roster.push({ c, n, name });
+                    }
                 }
             });
 
             try {
                 for (let file of selectedFiles) {
-                    if (file.type === 'application/pdf') await loadPdfToImages(file);
-                    else await loadImageFile(file);
+                    if (file.type === 'application/pdf') {
+                        await loadPdfToImages(file);
+                    } else {
+                        await loadImageFile(file);
+                    }
                 }
 
                 const totalPages = processingQueue.length;
@@ -270,28 +379,47 @@
                 const subjCount = parseInt(subjCountInput.value) || 4;
                 const startSubjNum = objCount + 1;
 
-                let scannedResultsMap = {}; 
+                let scannedResultsMap = {};
+                let duplicateList = [];
+                let unreadablePages = [];
 
                 for (let i = 0; i < totalPages; i++) {
                     const item = processingQueue[i];
-                    progressText.innerText = `스캔 분석 중... (${i+1}/${totalPages} 페이지)`;
-                    
-                    mainCanvas.width = item.img.width; mainCanvas.height = item.img.height;
+
+                    progressText.innerText = `스캔 분석 중... (${i + 1}/${totalPages} 페이지)`;
+
+                    mainCanvas.width = item.img.width;
+                    mainCanvas.height = item.img.height;
                     ctx.drawImage(item.img, 0, 0, mainCanvas.width, mainCanvas.height);
+
                     applyBinarization();
-                    
+
                     const rawData = performRealOMR(objCount, subjCount);
-                    const fCls = rawData[0]; const fNum = rawData[1];
+
+                    const fCls = rawData[0];
+                    const fNum = rawData[1];
                     const objAns = rawData.slice(2, 2 + objCount);
                     const subSc = rawData.slice(2 + objCount);
 
-                    if(fCls > 0 && fNum > 0) {
-                        scannedResultsMap[`${fCls}-${fNum}`] = { objAns, subSc };
+                    if (fCls > 0 && fNum > 0) {
+                        const key = `${fCls}-${fNum}`;
+
+                        if (scannedResultsMap[key]) {
+                            duplicateList.push(`${fCls}반 ${fNum}번`);
+                        }
+
+                        scannedResultsMap[key] = {
+                            objAns,
+                            subSc,
+                            sourceName: item.name
+                        };
+                    } else {
+                        unreadablePages.push(item.name);
                     }
-                    
+
                     ctx.putImageData(globalProcessedImageData, 0, 0);
                     drawROIBoxes();
-                    
+
                     await new Promise(r => setTimeout(r, 50));
                 }
 
@@ -305,7 +433,7 @@
 
                         if (scanData) {
                             processAndPushStudentData(student.c, student.n, student.name, scanData.objAns, scanData.subSc);
-                            delete scannedResultsMap[key]; 
+                            delete scannedResultsMap[key];
                         } else {
                             tsvData.push([student.c, student.n, student.name, subjectName, '결시', ' '.repeat(25), ''].join('\t'));
                         }
@@ -315,249 +443,597 @@
                 for (const key in scannedResultsMap) {
                     const [c, n] = key.split('-').map(Number);
                     const scanData = scannedResultsMap[key];
-                    processAndPushStudentData(c, n, roster.length > 0 ? "명부없음" : "", scanData.objAns, scanData.subSc);
+                    processAndPushStudentData(c, n, roster.length > 0 ? '명부없음' : '', scanData.objAns, scanData.subSc);
                 }
 
                 function processAndPushStudentData(c, n, name, objAns, subSc) {
-                    let objScore = 0; let objCorr = []; let wrongNums = [];
-                    const pointPerObj = (formTypeSelect.value === '25q') ? 4 : 5; 
+                    let objScore = 0;
+                    let objCorr = [];
+                    let wrongNums = [];
 
-                    if(hasAnswerKey) {
-                        for(let q=0; q<objCount; q++) {
-                            if(objAns[q] === answerKey[q] && answerKey[q] !== 0) { 
-                                objScore += pointPerObj; objCorr.push('O'); 
-                            } else { 
-                                objCorr.push('X'); 
-                                wrongNums.push(q+1); 
+                    const pointPerObj = (formTypeSelect.value === '25q') ? 4 : 5;
+
+                    if (hasAnswerKey) {
+                        for (let q = 0; q < objCount; q++) {
+                            if (objAns[q] === answerKey[q] && answerKey[q] !== 0) {
+                                objScore += pointPerObj;
+                                objCorr.push('O');
+                            } else {
+                                objCorr.push('X');
+                                wrongNums.push(q + 1);
                             }
                         }
                     }
-                    
+
+                    const safeSubSc = subSc.map(v => Math.max(0, Number(v) || 0));
+
                     let subjCorr = [];
-                    for(let i=0; i<subSc.length; i++) {
-                        if(subSc[i] > 0) {
+
+                    for (let i = 0; i < safeSubSc.length; i++) {
+                        if (safeSubSc[i] > 0) {
                             subjCorr.push('O');
                         } else {
                             subjCorr.push('X');
                             wrongNums.push(startSubjNum + i);
                         }
                     }
-                    
-                    const subjTotal = subSc.reduce((a,b)=>a+b, 0);
+
+                    const subjTotal = safeSubSc.reduce((a, b) => a + b, 0);
                     const totalScore = objScore + subjTotal;
-                    
+
                     let oxString = (hasAnswerKey ? objCorr.join('') : objAns.join('')) + subjCorr.join('');
-                    oxString = oxString.padEnd(25, ' '); 
-                    
+                    oxString = oxString.padEnd(25, ' ');
+
                     const wrongString = wrongNums.join(', ');
 
                     tsvData.push([c, n, name, subjectName, totalScore, oxString, wrongString].join('\t'));
-                    
-                    allStudentsData.push({ 
-                        classNum: c, studentNum: n, name: name, subjectName: subjectName,
-                        objAnswers: objAns, objCorrect: objCorr, subjScores: subSc, subjCorrect: subjCorr,
-                        objScore, subjTotal, totalScore, objCount, startSubjNum
+
+                    allStudentsData.push({
+                        classNum: c,
+                        studentNum: n,
+                        name: name,
+                        subjectName: subjectName,
+                        objAnswers: objAns,
+                        objCorrect: objCorr,
+                        subjScores: safeSubSc,
+                        subjCorrect: subjCorr,
+                        objScore,
+                        subjTotal,
+                        totalScore,
+                        objCount,
+                        startSubjNum
                     });
                 }
 
-                csvOutput.value = tsvData.join('\n');
-                progressText.innerText = "채점 및 명부 매칭이 완료되었습니다!";
-                statusAlert.classList.replace('bg-yellow-50', 'bg-green-50');
-                if(hasAnswerKey) btnViewReports.classList.remove('hidden');
+                let finalMessage = '채점 및 명부 매칭이 완료되었습니다!';
 
-            } catch (e) { console.error(e); } finally { btnProcess.disabled = false; }
+                if (duplicateList.length > 0) {
+                    finalMessage += ` / 중복 스캔: ${duplicateList.join(', ')}`;
+                }
+
+                if (unreadablePages.length > 0) {
+                    finalMessage += ` / 학반·번호 미인식: ${unreadablePages.length}페이지`;
+                    console.warn('학반·번호 미인식 페이지:', unreadablePages);
+                }
+
+                csvOutput.value = tsvData.join('\n');
+
+                progressText.innerText = finalMessage;
+
+                statusAlert.classList.remove('bg-yellow-50', 'border-yellow-400', 'text-yellow-700');
+                statusAlert.classList.add('bg-green-50', 'border-green-400', 'text-green-700');
+
+                if (hasAnswerKey) {
+                    btnViewReports.classList.remove('hidden');
+                }
+
+            } catch (e) {
+                console.error(e);
+
+                progressText.innerText = '오류가 발생했습니다. 콘솔을 확인해 주세요: ' + (e && e.message ? e.message : e);
+
+                statusAlert.classList.remove('bg-yellow-50', 'border-yellow-400', 'text-yellow-700', 'bg-green-50', 'border-green-400', 'text-green-700');
+                statusAlert.classList.add('bg-red-50', 'border-red-400', 'text-red-700');
+            } finally {
+                btnProcess.disabled = false;
+            }
         });
 
         btnViewReports.addEventListener('click', () => {
-            mainUi.classList.add('hidden'); reportUi.classList.remove('hidden');
-            reportContainer.innerHTML = allStudentsData.map(s => `
-                <div class="report-card p-6 border rounded-xl bg-white print:break-inside-avoid">
-                    <div class="border-b-2 border-gray-800 pb-2 mb-4 flex justify-between items-end">
-                        <h3 class="text-xl font-bold">${s.subjectName} 분석 결과</h3>
-                        <div class="text-lg font-bold">${s.classNum}반 ${s.studentNum}번 ${s.name ? `(${s.name})` : ''}</div>
-                    </div>
-                    <div class="flex justify-around bg-blue-50 p-4 rounded-lg mb-4">
-                        <div class="text-center"><b>총점</b><br><span class="text-3xl font-black text-blue-900">${s.totalScore}점</span></div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div><h4 class="font-bold text-sm bg-blue-100 p-1 mb-2 text-center">객관식</h4>
-                        ${s.objAnswers.map((a,i)=>`<div class="flex justify-between text-xs border-b"><span>${i+1}번</span><span>마킹:${a||'-'}</span><span class="font-bold ${s.objCorrect[i]==='O'?'text-blue-600':'text-red-500'}">${s.objCorrect[i] || ''}</span></div>`).join('')}
+            mainUi.classList.add('hidden');
+            reportUi.classList.remove('hidden');
+
+            reportContainer.innerHTML = allStudentsData.map(s => {
+                const safeSubject = escapeHTML(s.subjectName);
+                const safeName = escapeHTML(s.name);
+
+                return `
+                    <div class="report-card p-6 border rounded-xl bg-white print:break-inside-avoid">
+                        <div class="border-b-2 border-gray-800 pb-2 mb-4 flex justify-between items-end">
+                            <h3 class="text-xl font-bold">${safeSubject} 분석 결과</h3>
+                            <div class="text-lg font-bold">${s.classNum}반 ${s.studentNum}번 ${safeName ? `(${safeName})` : ''}</div>
                         </div>
-                        <div><h4 class="font-bold text-sm bg-purple-100 p-1 mb-2 text-center">주관식</h4>
-                        ${s.subjScores.map((sc,i)=>`<div class="flex justify-between text-xs border-b"><span>${s.objCount+i+1}번</span><span class="font-bold text-purple-600">${sc}점</span></div>`).join('')}
+
+                        <div class="flex justify-around bg-blue-50 p-4 rounded-lg mb-4">
+                            <div class="text-center">
+                                <b>총점</b><br>
+                                <span class="text-3xl font-black text-blue-900">${s.totalScore}점</span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <h4 class="font-bold text-sm bg-blue-100 p-1 mb-2 text-center">객관식</h4>
+                                ${s.objAnswers.map((a, i) => `
+                                    <div class="flex justify-between text-xs border-b">
+                                        <span>${i + 1}번</span>
+                                        <span>마킹:${a > 0 ? a : '-'}</span>
+                                        <span class="font-bold ${s.objCorrect[i] === 'O' ? 'text-blue-600' : 'text-red-500'}">${s.objCorrect[i] || ''}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+
+                            <div>
+                                <h4 class="font-bold text-sm bg-purple-100 p-1 mb-2 text-center">주관식</h4>
+                                ${s.subjScores.map((sc, i) => `
+                                    <div class="flex justify-between text-xs border-b">
+                                        <span>${s.objCount + i + 1}번</span>
+                                        <span class="font-bold text-purple-600">${sc}점</span>
+                                    </div>
+                                `).join('')}
+                            </div>
                         </div>
                     </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         });
 
-        document.getElementById('btnPrint').addEventListener('click', () => { window.print(); });
-        document.getElementById('btnBack').addEventListener('click', () => { reportUi.classList.add('hidden'); mainUi.classList.remove('hidden'); });
+        document.getElementById('btnPrint').addEventListener('click', () => {
+            window.print();
+        });
+
+        document.getElementById('btnBack').addEventListener('click', () => {
+            reportUi.classList.add('hidden');
+            mainUi.classList.remove('hidden');
+        });
+
         document.getElementById('btnCopy').addEventListener('click', () => {
-            csvOutput.select(); document.execCommand('copy');
-            const originalText = btnCopy.innerText; btnCopy.innerText = "✔️ 복사 완료!";
-            setTimeout(() => { btnCopy.innerText = originalText; }, 2000);
+            csvOutput.select();
+            document.execCommand('copy');
+
+            const originalText = btnCopy.innerText;
+            btnCopy.innerText = '✔️ 복사 완료!';
+
+            setTimeout(() => {
+                btnCopy.innerText = originalText;
+            }, 2000);
         });
 
         async function loadPdfToImages(file) {
             const pdf = await pdfjsLib.getDocument(new Uint8Array(await file.arrayBuffer())).promise;
+
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
                 const viewport = page.getViewport({ scale: 2.0 });
+
                 const canvas = document.createElement('canvas');
-                canvas.height = viewport.height; canvas.width = viewport.width;
-                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-                const img = new Image(); img.src = canvas.toDataURL('image/jpeg');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                await page.render({
+                    canvasContext: canvas.getContext('2d'),
+                    viewport
+                }).promise;
+
+                const img = new Image();
+                img.src = canvas.toDataURL('image/jpeg');
+
                 await new Promise(r => img.onload = r);
-                processingQueue.push({ img, name: `${file.name}(p${i})` });
+
+                processingQueue.push({
+                    img,
+                    name: `${file.name}(p${i})`
+                });
             }
         }
+
         function loadImageFile(file) {
             return new Promise(r => {
                 const reader = new FileReader();
+
                 reader.onload = e => {
                     const img = new Image();
-                    img.onload = () => { processingQueue.push({ img, name: file.name }); r(); };
+
+                    img.onload = () => {
+                        processingQueue.push({
+                            img,
+                            name: file.name
+                        });
+                        r();
+                    };
+
                     img.src = e.target.result;
                 };
+
                 reader.readAsDataURL(file);
             });
         }
+
         function applyBinarization() {
             const imgData = ctx.getImageData(0, 0, mainCanvas.width, mainCanvas.height);
             const data = imgData.data;
+
             for (let i = 0; i < data.length; i += 4) {
-                const b = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+                const b = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
                 const c = b < 130 ? 0 : 255;
-                data[i] = data[i+1] = data[i+2] = c;
+
+                data[i] = c;
+                data[i + 1] = c;
+                data[i + 2] = c;
             }
+
             globalProcessedImageData = imgData;
         }
 
-        // 🌟 25문항 양식 좌표 정밀 보정 (선생님 피드백 반영 완료)
         function getRegions(w, h, type) {
             if (type === '25q') {
                 return {
-                    // 1. 학반 박스 : 상향(y 감소), 우측 이동(x 증가)
-                    classNum1: { x: w * 0.338, y: h * 0.111, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
-                    classNum2: { x: w * 0.410, y: h * 0.111, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
-                    classNum3: { x: w * 0.480, y: h * 0.111, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
-                    
-                    // 2. 번호 박스 : 상향, 우측 이동
-                    studentNum: { x: w * 0.210, y: h * 0.138, w: w * 0.718, h: h * 0.022, r: 1, c: 29 }, 
-                    
-                    // 3. 객관식 1~10번 : 우측으로 이동
-                    obj1: { x: w * 0.166, y: h * 0.235, w: w * 0.258, h: h * 0.355, r: 10, c: 5 }, 
-                    // 4. 객관식 11~20번 : 정상 위치 (10줄로 복구)
-                    obj2: { x: w * 0.615, y: h * 0.235, w: w * 0.258, h: h * 0.355, r: 10, c: 5 }, 
-                    // 5. 객관식 21번 : 20번 밑에 추가
-                    obj3: { x: w * 0.615, y: h * 0.600, w: w * 0.258, h: h * 0.035, r: 1, c: 5 },
-                    
-                    // 6. 주관식 22번 : 1/2 하향
-                    subj22: { x: w * 0.145, y: h * 0.797, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }, 
-                    // 7. 주관식 23번 : 1/2 하향, 우측으로 조금 이동
-                    subj23: { x: w * 0.600, y: h * 0.797, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }, 
-                    // 주관식 24, 25번 : (이전 보정값 유지)
-                    subj24: { x: w * 0.148, y: h * 0.925, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }, 
-                    subj25: { x: w * 0.595, y: h * 0.925, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }  
+                    classNum1: {
+                        x: w * 0.338,
+                        y: h * 0.111,
+                        w: w * 0.026,
+                        h: h * 0.023,
+                        r: 1,
+                        c: 1
+                    },
+
+                    classNum2: {
+                        x: w * 0.410,
+                        y: h * 0.111,
+                        w: w * 0.026,
+                        h: h * 0.023,
+                        r: 1,
+                        c: 1
+                    },
+
+                    classNum3: {
+                        x: w * 0.480,
+                        y: h * 0.111,
+                        w: w * 0.026,
+                        h: h * 0.023,
+                        r: 1,
+                        c: 1
+                    },
+
+                    studentNum: {
+                        x: w * 0.210,
+                        y: h * 0.138,
+                        w: w * 0.718,
+                        h: h * 0.022,
+                        r: 1,
+                        c: 29
+                    },
+
+                    // 객관식 1~10번
+                    obj1: {
+                        x: w * 0.177,
+                        y: h * 0.227,
+                        w: w * 0.252,
+                        h: h * 0.355,
+                        r: 10,
+                        c: 5
+                    },
+
+                    // 객관식 11~20번
+                    obj2: {
+                        x: w * 0.628,
+                        y: h * 0.227,
+                        w: w * 0.252,
+                        h: h * 0.355,
+                        r: 10,
+                        c: 5
+                    },
+
+                    // 객관식 21번 전용 좌표
+                    obj3: {
+                        x: w * 0.628,
+                        y: h * 0.582,
+                        w: w * 0.252,
+                        h: h * 0.036,
+                        r: 1,
+                        c: 5
+                    },
+
+                    // 주관식 22번 점수 0~5
+                    subj22: {
+                        x: w * 0.147,
+                        y: h * 0.767,
+                        w: w * 0.300,
+                        h: h * 0.036,
+                        r: 1,
+                        c: 6
+                    },
+
+                    // 주관식 23번 점수 0~5
+                    subj23: {
+                        x: w * 0.600,
+                        y: h * 0.767,
+                        w: w * 0.304,
+                        h: h * 0.036,
+                        r: 1,
+                        c: 6
+                    },
+
+                    // 주관식 24번 점수 0~5
+                    subj24: {
+                        x: w * 0.147,
+                        y: h * 0.916,
+                        w: w * 0.300,
+                        h: h * 0.036,
+                        r: 1,
+                        c: 6
+                    },
+
+                    // 주관식 25번 점수 0~5
+                    subj25: {
+                        x: w * 0.598,
+                        y: h * 0.916,
+                        w: w * 0.305,
+                        h: h * 0.036,
+                        r: 1,
+                        c: 6
+                    }
                 };
             }
-            
-            // 기존 완벽 세팅된 20문항 양식
+
             return {
-                classNum1: { x: w * 0.326, y: h * 0.118, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
-                classNum2: { x: w * 0.400, y: h * 0.118, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
-                classNum3: { x: w * 0.471, y: h * 0.116, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
-                studentNum: { x: w * 0.198, y: h * 0.143, w: w * 0.718, h: h * 0.022, r: 1, c: 29 }, 
-                obj1: { x: w * 0.158, y: h * 0.228, w: w * 0.258, h: h * 0.352, r: 10, c: 5 },
-                obj2: { x: w * 0.615, y: h * 0.228, w: w * 0.258, h: h * 0.352, r: 10, c: 5 }, 
-                subj17: { x: w * 0.145, y: h * 0.755, w: w * 0.298, h: h * 0.025, r: 1, c: 6 },
-                subj18: { x: w * 0.590, y: h * 0.755, w: w * 0.298, h: h * 0.025, r: 1, c: 6 },
-                subj19: { x: w * 0.145, y: h * 0.925, w: w * 0.298, h: h * 0.025, r: 1, c: 6 },
-                subj20: { x: w * 0.590, y: h * 0.925, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }
+                classNum1: {
+                    x: w * 0.326,
+                    y: h * 0.118,
+                    w: w * 0.026,
+                    h: h * 0.023,
+                    r: 1,
+                    c: 1
+                },
+
+                classNum2: {
+                    x: w * 0.400,
+                    y: h * 0.118,
+                    w: w * 0.026,
+                    h: h * 0.023,
+                    r: 1,
+                    c: 1
+                },
+
+                classNum3: {
+                    x: w * 0.471,
+                    y: h * 0.116,
+                    w: w * 0.026,
+                    h: h * 0.023,
+                    r: 1,
+                    c: 1
+                },
+
+                studentNum: {
+                    x: w * 0.198,
+                    y: h * 0.143,
+                    w: w * 0.718,
+                    h: h * 0.022,
+                    r: 1,
+                    c: 29
+                },
+
+                obj1: {
+                    x: w * 0.158,
+                    y: h * 0.228,
+                    w: w * 0.258,
+                    h: h * 0.352,
+                    r: 10,
+                    c: 5
+                },
+
+                obj2: {
+                    x: w * 0.615,
+                    y: h * 0.228,
+                    w: w * 0.258,
+                    h: h * 0.352,
+                    r: 10,
+                    c: 5
+                },
+
+                subj17: {
+                    x: w * 0.145,
+                    y: h * 0.755,
+                    w: w * 0.298,
+                    h: h * 0.025,
+                    r: 1,
+                    c: 6
+                },
+
+                subj18: {
+                    x: w * 0.590,
+                    y: h * 0.755,
+                    w: w * 0.298,
+                    h: h * 0.025,
+                    r: 1,
+                    c: 6
+                },
+
+                subj19: {
+                    x: w * 0.145,
+                    y: h * 0.925,
+                    w: w * 0.298,
+                    h: h * 0.025,
+                    r: 1,
+                    c: 6
+                },
+
+                subj20: {
+                    x: w * 0.590,
+                    y: h * 0.925,
+                    w: w * 0.298,
+                    h: h * 0.025,
+                    r: 1,
+                    c: 6
+                }
             };
         }
 
         function calculateDarkness(x, y, w, h) {
-            let black = 0; let total = w * h;
-            x = Math.floor(x); y = Math.floor(y); w = Math.floor(w); h = Math.floor(h);
+            let black = 0;
+
+            x = Math.floor(x);
+            y = Math.floor(y);
+            w = Math.floor(w);
+            h = Math.floor(h);
+
+            if (!globalProcessedImageData) {
+                return 0;
+            }
+
+            const data = globalProcessedImageData.data;
+            const canvasW = mainCanvas.width;
+            const canvasH = mainCanvas.height;
+
             for (let row = 0; row < h; row++) {
+                const py = y + row;
+
+                if (py < 0 || py >= canvasH) continue;
+
                 for (let col = 0; col < w; col++) {
-                    const idx = ((y + row) * mainCanvas.width + (x + col)) * 4;
-                    if (globalProcessedImageData && globalProcessedImageData.data[idx] < 128) black++;
+                    const px = x + col;
+
+                    if (px < 0 || px >= canvasW) continue;
+
+                    const idx = (py * canvasW + px) * 4;
+
+                    if (data[idx] < 128) {
+                        black++;
+                    }
                 }
             }
+
+            const total = Math.max(1, w * h);
             return black / total;
         }
 
         function scanGrid(startX, startY, width, height, rows, cols) {
-            const res = []; const cW = width / cols; const cH = height / rows;
+            const res = [];
+            const cW = width / cols;
+            const cH = height / rows;
+
             for (let r = 0; r < rows; r++) {
-                let maxD = 0; let bestC = -1;
+                let maxD = 0;
+                let bestC = -1;
+
                 for (let c = 0; c < cols; c++) {
-                    const sX = startX + c * cW + cW * 0.125; const sY = startY + r * cH + cH * 0.125;
-                    const sW = cW * 0.75; const sH = cH * 0.75;
+                    const sX = startX + c * cW + cW * 0.125;
+                    const sY = startY + r * cH + cH * 0.125;
+                    const sW = cW * 0.75;
+                    const sH = cH * 0.75;
+
                     const d = calculateDarkness(sX, sY, sW, sH);
-                    if (d > maxD) { maxD = d; bestC = c; }
+
+                    if (d > maxD) {
+                        maxD = d;
+                        bestC = c;
+                    }
                 }
+
                 res.push(maxD < 0.10 ? -1 : bestC);
             }
+
             return res;
         }
 
         function performRealOMR(oC, sC) {
             const currentType = formTypeSelect.value;
             const r = getRegions(mainCanvas.width, mainCanvas.height, currentType);
-            
+
             const c1 = scanGrid(r.classNum1.x, r.classNum1.y, r.classNum1.w, r.classNum1.h, 1, 1);
             const c2 = scanGrid(r.classNum2.x, r.classNum2.y, r.classNum2.w, r.classNum2.h, 1, 1);
             const c3 = scanGrid(r.classNum3.x, r.classNum3.y, r.classNum3.w, r.classNum3.h, 1, 1);
-            let cls = c1[0]!==-1?1:c2[0]!==-1?2:c3[0]!==-1?3:0;
+
+            let cls = c1[0] !== -1 ? 1 : c2[0] !== -1 ? 2 : c3[0] !== -1 ? 3 : 0;
+
             const sn = scanGrid(r.studentNum.x, r.studentNum.y, r.studentNum.w, r.studentNum.h, 1, 29);
-            
+            const studentNumber = sn[0] === -1 ? 0 : sn[0] + 1;
+
             if (currentType === '25q') {
-                const o1 = scanGrid(r.obj1.x, r.obj1.y, r.obj1.w, r.obj1.h, 10, 5); 
-                const o2 = scanGrid(r.obj2.x, r.obj2.y, r.obj2.w, r.obj2.h, 10, 5); 
-                // 🌟 21번을 분리하여 스캔 (`obj3`)
+                const o1 = scanGrid(r.obj1.x, r.obj1.y, r.obj1.w, r.obj1.h, 10, 5);
+                const o2 = scanGrid(r.obj2.x, r.obj2.y, r.obj2.w, r.obj2.h, 10, 5);
                 const o3 = scanGrid(r.obj3.x, r.obj3.y, r.obj3.w, r.obj3.h, 1, 5);
-                
+
                 const s22 = scanGrid(r.subj22.x, r.subj22.y, r.subj22.w, r.subj22.h, 1, 6);
                 const s23 = scanGrid(r.subj23.x, r.subj23.y, r.subj23.w, r.subj23.h, 1, 6);
                 const s24 = scanGrid(r.subj24.x, r.subj24.y, r.subj24.w, r.subj24.h, 1, 6);
                 const s25 = scanGrid(r.subj25.x, r.subj25.y, r.subj25.w, r.subj25.h, 1, 6);
-                
-                // 1~21번까지 합치기 (o3 포함)
-                const allObj = [...o1, ...o2, ...o3].slice(0, oC).map(v=>v+1);
-                const allSubj = [s22[0], s23[0], s24[0], s25[0]].slice(0, sC);
-                
-                return [cls, sn[0]+1, ...allObj, ...allSubj];
-            } else {
-                const o1 = scanGrid(r.obj1.x, r.obj1.y, r.obj1.w, r.obj1.h, 10, 5);
-                const o2 = scanGrid(r.obj2.x, r.obj2.y, r.obj2.w, r.obj2.h, 10, 5);
-                const s17 = scanGrid(r.subj17.x, r.subj17.y, r.subj17.w, r.subj17.h, 1, 6);
-                const s18 = scanGrid(r.subj18.x, r.subj18.y, r.subj18.w, r.subj18.h, 1, 6);
-                const s19 = scanGrid(r.subj19.x, r.subj19.y, r.subj19.w, r.subj19.h, 1, 6);
-                const s20 = scanGrid(r.subj20.x, r.subj20.y, r.subj20.w, r.subj20.h, 1, 6);
-                return [cls, sn[0]+1, ...[...o1, ...o2].slice(0, oC).map(v=>v+1), ...[s17[0], s18[0], s19[0], s20[0]].slice(0, sC)];
+
+                const allObj = [...o1, ...o2, ...o3]
+                    .slice(0, oC)
+                    .map(v => v === -1 ? 0 : v + 1);
+
+                const allSubj = [s22[0], s23[0], s24[0], s25[0]]
+                    .slice(0, sC);
+
+                return [cls, studentNumber, ...allObj, ...allSubj];
             }
+
+            const o1 = scanGrid(r.obj1.x, r.obj1.y, r.obj1.w, r.obj1.h, 10, 5);
+            const o2 = scanGrid(r.obj2.x, r.obj2.y, r.obj2.w, r.obj2.h, 10, 5);
+
+            const s17 = scanGrid(r.subj17.x, r.subj17.y, r.subj17.w, r.subj17.h, 1, 6);
+            const s18 = scanGrid(r.subj18.x, r.subj18.y, r.subj18.w, r.subj18.h, 1, 6);
+            const s19 = scanGrid(r.subj19.x, r.subj19.y, r.subj19.w, r.subj19.h, 1, 6);
+            const s20 = scanGrid(r.subj20.x, r.subj20.y, r.subj20.w, r.subj20.h, 1, 6);
+
+            const allObj = [...o1, ...o2]
+                .slice(0, oC)
+                .map(v => v === -1 ? 0 : v + 1);
+
+            const allSubj = [s17[0], s18[0], s19[0], s20[0]]
+                .slice(0, sC);
+
+            return [cls, studentNumber, ...allObj, ...allSubj];
         }
 
         function drawROIBoxes() {
-            if (!globalProcessedImageData) return;
             const currentType = formTypeSelect.value;
-            const w = mainCanvas.width; const h = mainCanvas.height; 
+            const w = mainCanvas.width;
+            const h = mainCanvas.height;
+
+            if (!w || !h) return;
+
             const r = getRegions(w, h, currentType);
+
             ctx.lineWidth = Math.max(1, w * 0.001);
-            
-            ctx.putImageData(globalProcessedImageData, 0, 0);
+
+            if (globalProcessedImageData) {
+                ctx.putImageData(globalProcessedImageData, 0, 0);
+            }
 
             for (const key in r) {
                 const reg = r[key];
-                ctx.strokeStyle = 'rgba(59, 130, 246, 0.9)'; ctx.strokeRect(reg.x, reg.y, reg.w, reg.h);
-                ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)'; ctx.beginPath();
-                const cellW = reg.w / reg.c; const cellH = reg.h / reg.r;
-                for(let i=1; i<reg.c; i++) { ctx.moveTo(reg.x + i*cellW, reg.y); ctx.lineTo(reg.x + i*cellW, reg.y + reg.h); }
-                for(let i=1; i<reg.r; i++) { ctx.moveTo(reg.x, reg.y + i*cellH); ctx.lineTo(reg.x + reg.w, reg.y + i*cellH); }
+
+                ctx.strokeStyle = 'rgba(59, 130, 246, 0.9)';
+                ctx.strokeRect(reg.x, reg.y, reg.w, reg.h);
+
+                ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)';
+                ctx.beginPath();
+
+                const cellW = reg.w / reg.c;
+                const cellH = reg.h / reg.r;
+
+                for (let i = 1; i < reg.c; i++) {
+                    ctx.moveTo(reg.x + i * cellW, reg.y);
+                    ctx.lineTo(reg.x + i * cellW, reg.y + reg.h);
+                }
+
+                for (let i = 1; i < reg.r; i++) {
+                    ctx.moveTo(reg.x, reg.y + i * cellH);
+                    ctx.lineTo(reg.x + reg.w, reg.y + i * cellH);
+                }
+
                 ctx.stroke();
             }
         }
