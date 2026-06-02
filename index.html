@@ -51,14 +51,23 @@
                     </div>
                 </div>
 
+                <!-- 🌟 OMR 양식 선택 드롭다운 -->
+                <div>
+                    <label class="block text-xs font-medium text-gray-700">OMR 양식 템플릿 선택</label>
+                    <select id="formType" class="mt-1 w-full border border-blue-400 rounded p-1.5 text-sm font-bold text-blue-700 bg-blue-50 focus:outline-none">
+                        <option value="20q">양식 A (총 20문항: 객16 + 주4 / 객관식 5점)</option>
+                        <option value="25q">양식 B (총 25문항: 객21 + 주4 / 객관식 4점)</option>
+                    </select>
+                </div>
+
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-medium text-gray-700">객관식 문항 수</label>
-                        <input type="number" id="objCount" value="16" min="1" max="25" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm">
+                        <input type="number" id="objCount" value="16" min="1" max="25" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm bg-gray-100" readonly>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-700">주관식 문항 수</label>
-                        <input type="number" id="subjCount" value="4" min="0" max="10" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm">
+                        <input type="number" id="subjCount" value="4" min="0" max="10" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm bg-gray-100" readonly>
                     </div>
                 </div>
 
@@ -148,11 +157,13 @@
         const mainUi = document.getElementById('main-ui');
         const reportUi = document.getElementById('report-ui');
         const reportContainer = document.getElementById('reportContainer');
+        const formTypeSelect = document.getElementById('formType');
 
         let selectedFiles = [];
         let processingQueue = []; 
         let globalProcessedImageData = null;
         let allStudentsData = []; 
+        let originalImage = null; // 원본 이미지 저장을 위해 추가
 
         // 1. 정답 표 렌더링
         function renderAnswerTable() {
@@ -185,15 +196,51 @@
             }
         }
 
+        // 🌟 양식 선택 시 동작
+        formTypeSelect.addEventListener('change', (e) => {
+            if (e.target.value === '20q') {
+                objCountInput.value = 16;
+                subjCountInput.value = 4;
+            } else if (e.target.value === '25q') {
+                objCountInput.value = 21;
+                subjCountInput.value = 4;
+            }
+            renderAnswerTable();
+            
+            // 이미지가 올라가 있는 상태라면 모눈종이 즉시 다시 그리기
+            if (originalImage) {
+                ctx.drawImage(originalImage, 0, 0, mainCanvas.width, mainCanvas.height);
+                drawROIBoxes();
+            }
+        });
+
         objCountInput.addEventListener('change', renderAnswerTable);
         document.getElementById('btnClearAnswers').addEventListener('click', () => { document.querySelectorAll('.answer-input').forEach(input => input.value = ''); });
         document.addEventListener('DOMContentLoaded', renderAnswerTable);
 
-        imageUpload.addEventListener('change', (e) => {
+        // 🌟 파일 업로드 시 모눈종이(그리드) 그리기
+        imageUpload.addEventListener('change', async (e) => {
             selectedFiles = Array.from(e.target.files);
             if (selectedFiles.length === 0) { btnProcess.disabled = true; return; }
             fileListDiv.innerHTML = selectedFiles.map(f => `<div class="truncate">${f.type === 'application/pdf' ? '📑' : '🖼️'} ${f.name}</div>`).join('');
             btnProcess.disabled = false;
+
+            // 첫 번째 파일을 캔버스에 띄워 좌표 확인용으로 보여줌
+            const file = selectedFiles[0];
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    originalImage = new Image();
+                    originalImage.onload = () => {
+                        mainCanvas.width = originalImage.width;
+                        mainCanvas.height = originalImage.height;
+                        ctx.drawImage(originalImage, 0, 0, mainCanvas.width, mainCanvas.height);
+                        drawROIBoxes(); // 파란색 영역 표시!
+                    };
+                    originalImage.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
         });
 
         // 2. 메인 처리 로직
@@ -247,6 +294,11 @@
                     if(fCls > 0 && fNum > 0) {
                         scannedResultsMap[`${fCls}-${fNum}`] = { objAns, subSc };
                     }
+                    
+                    // 처리 중인 이미지를 보여주기 위함
+                    ctx.putImageData(globalProcessedImageData, 0, 0);
+                    drawROIBoxes();
+                    
                     await new Promise(r => setTimeout(r, 50));
                 }
 
@@ -262,7 +314,6 @@
                             processAndPushStudentData(student.c, student.n, student.name, scanData.objAns, scanData.subSc);
                             delete scannedResultsMap[key]; 
                         } else {
-                            // 🌟 결시자의 경우 정오표를 25자리의 공백으로 채움 (수식 꼬임 방지)
                             tsvData.push([student.c, student.n, student.name, subjectName, '결시', ' '.repeat(25), ''].join('\t'));
                         }
                     });
@@ -276,10 +327,12 @@
 
                 function processAndPushStudentData(c, n, name, objAns, subSc) {
                     let objScore = 0; let objCorr = []; let wrongNums = [];
+                    const pointPerObj = (formTypeSelect.value === '25q') ? 4 : 5; 
+
                     if(hasAnswerKey) {
                         for(let q=0; q<objCount; q++) {
                             if(objAns[q] === answerKey[q] && answerKey[q] !== 0) { 
-                                objScore += 5; objCorr.push('O'); 
+                                objScore += pointPerObj; objCorr.push('O'); 
                             } else { 
                                 objCorr.push('X'); 
                                 wrongNums.push(q+1); 
@@ -287,7 +340,6 @@
                         }
                     }
                     
-                    // 🌟 주관식 채점 로직 추가: 0점 초과면 'O', 0점이면 'X' 처리 및 틀린 번호 기록
                     let subjCorr = [];
                     for(let i=0; i<subSc.length; i++) {
                         if(subSc[i] > 0) {
@@ -301,7 +353,6 @@
                     const subjTotal = subSc.reduce((a,b)=>a+b, 0);
                     const totalScore = objScore + subjTotal;
                     
-                    // 🌟 정오표 25자리 고정 로직 (주관식도 O/X로 합침)
                     let oxString = (hasAnswerKey ? objCorr.join('') : objAns.join('')) + subjCorr.join('');
                     oxString = oxString.padEnd(25, ' '); 
                     
@@ -338,7 +389,7 @@
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div><h4 class="font-bold text-sm bg-blue-100 p-1 mb-2 text-center">객관식</h4>
-                        ${s.objAnswers.map((a,i)=>`<div class="flex justify-between text-xs border-b"><span>${i+1}번</span><span>마킹:${a||'-'}</span><span class="font-bold ${s.objCorrect[i]==='O'?'text-blue-600':'text-red-500'}">${s.objCorrect[i]}</span></div>`).join('')}
+                        ${s.objAnswers.map((a,i)=>`<div class="flex justify-between text-xs border-b"><span>${i+1}번</span><span>마킹:${a||'-'}</span><span class="font-bold ${s.objCorrect[i]==='O'?'text-blue-600':'text-red-500'}">${s.objCorrect[i] || ''}</span></div>`).join('')}
                         </div>
                         <div><h4 class="font-bold text-sm bg-purple-100 p-1 mb-2 text-center">주관식</h4>
                         ${s.subjScores.map((sc,i)=>`<div class="flex justify-between text-xs border-b"><span>${s.objCount+i+1}번</span><span class="font-bold text-purple-600">${sc}점</span></div>`).join('')}
@@ -391,11 +442,28 @@
             }
             globalProcessedImageData = imgData;
         }
-        function getRegions(w, h) {
+
+        // 🌟 양식 선택에 따른 영역 반환
+        function getRegions(w, h, type) {
+            if (type === '25q') {
+                return {
+                    classNum1: { x: w * 0.326, y: h * 0.118, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
+                    classNum2: { x: w * 0.400, y: h * 0.118, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
+                    classNum3: { x: w * 0.471, y: h * 0.116, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
+                    studentNum: { x: w * 0.198, y: h * 0.143, w: w * 0.718, h: h * 0.022, r: 1, c: 29 }, 
+                    obj1: { x: w * 0.158, y: h * 0.228, w: w * 0.258, h: h * 0.380, r: 11, c: 5 }, // 왼쪽 11문항 (가배치)
+                    obj2: { x: w * 0.615, y: h * 0.228, w: w * 0.258, h: h * 0.352, r: 10, c: 5 }, // 오른쪽 10문항
+                    subj22: { x: w * 0.145, y: h * 0.755, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }, // 22번 가배치
+                    subj23: { x: w * 0.590, y: h * 0.755, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }, // 23번 가배치
+                    subj24: { x: w * 0.145, y: h * 0.925, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }, // 24번 가배치
+                    subj25: { x: w * 0.590, y: h * 0.925, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }  // 25번 가배치
+                };
+            }
+            // 기존 완벽 세팅된 20q 양식
             return {
-                classNum1: { x: w * 0.326, y: h * 0.116, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
-                classNum2: { x: w * 0.400, y: h * 0.116, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
-                classNum3: { x: w * 0.463, y: h * 0.114, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
+                classNum1: { x: w * 0.326, y: h * 0.118, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
+                classNum2: { x: w * 0.400, y: h * 0.118, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
+                classNum3: { x: w * 0.471, y: h * 0.116, w: w * 0.026, h: h * 0.023, r: 1, c: 1 }, 
                 studentNum: { x: w * 0.198, y: h * 0.143, w: w * 0.718, h: h * 0.022, r: 1, c: 29 }, 
                 obj1: { x: w * 0.158, y: h * 0.228, w: w * 0.258, h: h * 0.352, r: 10, c: 5 },
                 obj2: { x: w * 0.615, y: h * 0.228, w: w * 0.258, h: h * 0.352, r: 10, c: 5 }, 
@@ -405,17 +473,19 @@
                 subj20: { x: w * 0.590, y: h * 0.925, w: w * 0.298, h: h * 0.025, r: 1, c: 6 }
             };
         }
+
         function calculateDarkness(x, y, w, h) {
             let black = 0; let total = w * h;
             x = Math.floor(x); y = Math.floor(y); w = Math.floor(w); h = Math.floor(h);
             for (let row = 0; row < h; row++) {
                 for (let col = 0; col < w; col++) {
                     const idx = ((y + row) * mainCanvas.width + (x + col)) * 4;
-                    if (globalProcessedImageData.data[idx] < 128) black++;
+                    if (globalProcessedImageData && globalProcessedImageData.data[idx] < 128) black++;
                 }
             }
             return black / total;
         }
+
         function scanGrid(startX, startY, width, height, rows, cols) {
             const res = []; const cW = width / cols; const cH = height / rows;
             for (let r = 0; r < rows; r++) {
@@ -430,20 +500,54 @@
             }
             return res;
         }
+
         function performRealOMR(oC, sC) {
-            const r = getRegions(mainCanvas.width, mainCanvas.height);
+            const currentType = formTypeSelect.value;
+            const r = getRegions(mainCanvas.width, mainCanvas.height, currentType);
+            
             const c1 = scanGrid(r.classNum1.x, r.classNum1.y, r.classNum1.w, r.classNum1.h, 1, 1);
             const c2 = scanGrid(r.classNum2.x, r.classNum2.y, r.classNum2.w, r.classNum2.h, 1, 1);
             const c3 = scanGrid(r.classNum3.x, r.classNum3.y, r.classNum3.w, r.classNum3.h, 1, 1);
             let cls = c1[0]!==-1?1:c2[0]!==-1?2:c3[0]!==-1?3:0;
             const sn = scanGrid(r.studentNum.x, r.studentNum.y, r.studentNum.w, r.studentNum.h, 1, 29);
-            const o1 = scanGrid(r.obj1.x, r.obj1.y, r.obj1.w, r.obj1.h, 10, 5);
-            const o2 = scanGrid(r.obj2.x, r.obj2.y, r.obj2.w, r.obj2.h, 10, 5);
-            const s17 = scanGrid(r.subj17.x, r.subj17.y, r.subj17.w, r.subj17.h, 1, 6);
-            const s18 = scanGrid(r.subj18.x, r.subj18.y, r.subj18.w, r.subj18.h, 1, 6);
-            const s19 = scanGrid(r.subj19.x, r.subj19.y, r.subj19.w, r.subj19.h, 1, 6);
-            const s20 = scanGrid(r.subj20.x, r.subj20.y, r.subj20.w, r.subj20.h, 1, 6);
-            return [cls, sn[0]+1, ...[...o1, ...o2].slice(0, oC).map(v=>v+1), ...[s17[0], s18[0], s19[0], s20[0]].slice(0, sC)];
+            
+            if (currentType === '25q') {
+                const o1 = scanGrid(r.obj1.x, r.obj1.y, r.obj1.w, r.obj1.h, 11, 5); 
+                const o2 = scanGrid(r.obj2.x, r.obj2.y, r.obj2.w, r.obj2.h, 10, 5); 
+                const s22 = scanGrid(r.subj22.x, r.subj22.y, r.subj22.w, r.subj22.h, 1, 6);
+                const s23 = scanGrid(r.subj23.x, r.subj23.y, r.subj23.w, r.subj23.h, 1, 6);
+                const s24 = scanGrid(r.subj24.x, r.subj24.y, r.subj24.w, r.subj24.h, 1, 6);
+                const s25 = scanGrid(r.subj25.x, r.subj25.y, r.subj25.w, r.subj25.h, 1, 6);
+                return [cls, sn[0]+1, ...[...o1, ...o2].slice(0, oC).map(v=>v+1), ...[s22[0], s23[0], s24[0], s25[0]].slice(0, sC)];
+            } else {
+                const o1 = scanGrid(r.obj1.x, r.obj1.y, r.obj1.w, r.obj1.h, 10, 5);
+                const o2 = scanGrid(r.obj2.x, r.obj2.y, r.obj2.w, r.obj2.h, 10, 5);
+                const s17 = scanGrid(r.subj17.x, r.subj17.y, r.subj17.w, r.subj17.h, 1, 6);
+                const s18 = scanGrid(r.subj18.x, r.subj18.y, r.subj18.w, r.subj18.h, 1, 6);
+                const s19 = scanGrid(r.subj19.x, r.subj19.y, r.subj19.w, r.subj19.h, 1, 6);
+                const s20 = scanGrid(r.subj20.x, r.subj20.y, r.subj20.w, r.subj20.h, 1, 6);
+                return [cls, sn[0]+1, ...[...o1, ...o2].slice(0, oC).map(v=>v+1), ...[s17[0], s18[0], s19[0], s20[0]].slice(0, sC)];
+            }
+        }
+
+        // 🌟 캔버스에 파란 모눈종이 그리기 함수
+        function drawROIBoxes() {
+            const currentType = formTypeSelect.value;
+            const w = mainCanvas.width; const h = mainCanvas.height; 
+            const r = getRegions(w, h, currentType);
+            ctx.lineWidth = Math.max(1, w * 0.001);
+            
+            for (const key in r) {
+                const reg = r[key];
+                // 테두리
+                ctx.strokeStyle = 'rgba(59, 130, 246, 0.9)'; ctx.strokeRect(reg.x, reg.y, reg.w, reg.h);
+                // 안쪽 격자
+                ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)'; ctx.beginPath();
+                const cellW = reg.w / reg.c; const cellH = reg.h / reg.r;
+                for(let i=1; i<reg.c; i++) { ctx.moveTo(reg.x + i*cellW, reg.y); ctx.lineTo(reg.x + i*cellW, reg.y + reg.h); }
+                for(let i=1; i<reg.r; i++) { ctx.moveTo(reg.x, reg.y + i*cellH); ctx.lineTo(reg.x + reg.w, reg.y + i*cellH); }
+                ctx.stroke();
+            }
         }
     </script>
 </body>
