@@ -362,6 +362,39 @@
                 }
             });
 
+            // ✅ 명부 기반 학반 보정용 인덱스
+            // 예: 스캔이 3반 15번으로 잘못 읽혀도, 명부에 15번이 1반에만 있으면 1반 15번으로 보정
+            const rosterKeySet = new Set();
+            const rosterNumToClasses = new Map();
+
+            roster.forEach(student => {
+                rosterKeySet.add(`${student.c}-${student.n}`);
+
+                if (!rosterNumToClasses.has(student.n)) {
+                    rosterNumToClasses.set(student.n, new Set());
+                }
+
+                rosterNumToClasses.get(student.n).add(student.c);
+            });
+
+            function correctClassByRoster(scannedClass, scannedNum) {
+                if (roster.length === 0 || !scannedNum || scannedNum <= 0) {
+                    return scannedClass;
+                }
+
+                if (rosterKeySet.has(`${scannedClass}-${scannedNum}`)) {
+                    return scannedClass;
+                }
+
+                const classSet = rosterNumToClasses.get(scannedNum);
+
+                if (classSet && classSet.size === 1) {
+                    return Array.from(classSet)[0];
+                }
+
+                return scannedClass;
+            }
+
             try {
                 for (let file of selectedFiles) {
                     if (file.type === 'application/pdf') {
@@ -393,8 +426,12 @@
 
                     const rawData = performRealOMR(objCount, subjCount);
 
-                    const fCls = rawData[0];
+                    let fCls = rawData[0];
                     const fNum = rawData[1];
+
+                    // ✅ 명부가 있으면 학반 오인식을 명부 기준으로 보정
+                    fCls = correctClassByRoster(fCls, fNum);
+
                     const objAns = rawData.slice(2, 2 + objCount);
                     const subSc = rawData.slice(2 + objCount);
 
@@ -777,10 +814,6 @@
             }
 
             return {
-                // ✅ 20문항 양식 A
-                // 학반, 객관식, 주관식 좌표는 유지
-                // 출석번호는 1번 시작점과 29번 끝점에 맞춰 최종 보정
-
                 classNum1: {
                     x: w * 0.323,
                     y: h * 0.114,
@@ -911,7 +944,7 @@
             return black / total;
         }
 
-        function calculateRegionDarknessInner(reg, marginXRatio = 0.22, marginYRatio = 0.22) {
+        function calculateRegionDarknessInner(reg, marginXRatio = 0.32, marginYRatio = 0.30) {
             const mx = reg.w * marginXRatio;
             const my = reg.h * marginYRatio;
 
@@ -946,11 +979,11 @@
 
             console.log('학반 인식값:', choices);
 
-            if (first.darkness < 0.12) {
+            if (first.darkness < 0.16) {
                 return 0;
             }
 
-            if (first.darkness - second.darkness < 0.025 && first.darkness < 0.25) {
+            if (first.darkness < second.darkness * 1.18) {
                 return 0;
             }
 
