@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OMR 자동 채점 & 명부 연동 시스템</title>
+    <title>OMR 자동 채점 & 명부 연동 시스템 - 양식 마커 보정</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
@@ -33,6 +33,7 @@
             width: 100%;
             height: auto;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            background: white;
         }
 
         @media print {
@@ -72,35 +73,38 @@
         <div class="w-full md:w-1/3 flex flex-col gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-gray-800">OMR 자동 채점기</h1>
-                <p class="text-xs text-blue-600 mt-1 font-bold">✓ 명부 연동 + 결시 처리 + 엑셀 정오표(25자리) + 메일머지</p>
+                <p class="text-xs text-blue-600 mt-1 font-bold">✓ 양식 마커 보정 + 명부 연동 + 결시 처리 + 엑셀 정오표</p>
             </div>
 
             <div class="bg-blue-50 p-3 rounded-md border border-blue-100 flex flex-col gap-3">
                 <h2 class="text-sm font-bold text-blue-800">1. 시험 기본 설정</h2>
 
-                <div class="flex gap-2">
-                    <div class="flex-grow">
-                        <label class="block text-xs font-medium text-gray-700">과목/시험명</label>
-                        <input type="text" id="subjectName" value="수학 3단원" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm">
-                    </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700">과목/시험명</label>
+                    <input type="text" id="subjectName" value="수학 단원평가" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm">
                 </div>
 
                 <div>
                     <label class="block text-xs font-medium text-gray-700">OMR 양식 템플릿 선택</label>
                     <select id="formType" class="mt-1 w-full border border-blue-400 rounded p-1.5 text-sm font-bold text-blue-700 bg-blue-50 focus:outline-none">
-                        <option value="20q">양식 A (총 20문항: 객16 + 주4 / 객관식 5점)</option>
-                        <option value="25q">양식 B (총 25문항: 객21 + 주4 / 객관식 4점)</option>
+                        <option value="new20">양식 기본형 (총 20문항: 객16 + 주4 / 객관식 5점)</option>
+                        <option value="newA">양식 A형 (총 25문항: 객18 + 단답3 + 주4 / 객관식 4점)</option>
+                        <option value="newB">양식 B형 (총 25문항: 객21 + 주4 / 객관식 4점)</option>
                     </select>
                 </div>
 
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-3 gap-3">
                     <div>
-                        <label class="block text-xs font-medium text-gray-700">객관식 문항 수</label>
-                        <input type="number" id="objCount" value="16" min="1" max="25" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm bg-gray-100" readonly>
+                        <label class="block text-xs font-medium text-gray-700">객관식</label>
+                        <input type="number" id="objCount" value="16" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm bg-gray-100" readonly>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-gray-700">주관식 문항 수</label>
-                        <input type="number" id="subjCount" value="4" min="0" max="10" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm bg-gray-100" readonly>
+                        <label class="block text-xs font-medium text-gray-700">점수형</label>
+                        <input type="number" id="subjCount" value="4" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm bg-gray-100" readonly>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700">이진화</label>
+                        <input type="number" id="thresholdInput" value="145" min="80" max="220" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm">
                     </div>
                 </div>
 
@@ -113,14 +117,13 @@
                     <div class="overflow-x-auto border border-gray-300 rounded bg-white">
                         <table class="w-full text-center text-xs whitespace-nowrap" id="answerTable"></table>
                     </div>
+                    <p class="text-[10px] text-gray-500 mt-1">* 객관식 정답만 입력합니다. 단답/주관식은 OMR의 점수 마킹값을 그대로 합산합니다.</p>
                 </div>
 
                 <div>
-                    <div class="flex justify-between items-end mb-1">
-                        <label class="block text-xs font-medium text-gray-700">학생 명부 (선택사항)</label>
-                    </div>
-                    <textarea id="rosterInput" rows="3" placeholder="엑셀에서 '학반', '번호', '이름' 3개 열을 복사해서 이곳에 붙여넣으세요." class="w-full border border-gray-300 rounded p-2 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 whitespace-pre text-gray-600"></textarea>
-                    <p class="text-[10px] text-gray-500 mt-1">* 명부를 넣으면 결시자가 자동 판별되고, 결과에 이름이 들어갑니다.</p>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">학생 명부 (선택사항)</label>
+                    <textarea id="rosterInput" rows="4" placeholder="엑셀에서 '학반', '번호', '이름' 3개 열을 복사해서 이곳에 붙여넣으세요." class="w-full border border-gray-300 rounded p-2 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 whitespace-pre text-gray-600"></textarea>
+                    <p class="text-[10px] text-gray-500 mt-1">* 명부를 넣으면 결시자가 자동 판별되고, 학반 오인식도 번호 기준으로 보정됩니다.</p>
                 </div>
             </div>
 
@@ -150,7 +153,7 @@
                     </div>
                 </h3>
 
-                <textarea id="csvOutput" class="w-full flex-grow min-h-[80px] text-xs p-2 border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none whitespace-pre" readonly></textarea>
+                <textarea id="csvOutput" class="w-full flex-grow min-h-[90px] text-xs p-2 border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none whitespace-pre" readonly></textarea>
                 <p class="text-[10px] text-gray-400 mt-2">* 엑셀의 빈 A1 셀에 바로 붙여넣기(Ctrl+V) 하세요.</p>
             </div>
         </div>
@@ -164,7 +167,7 @@
 
     <div id="report-ui" class="hidden max-w-5xl mx-auto print-only">
         <div class="mb-4 no-print flex justify-between items-center bg-gray-800 text-white p-4 rounded-lg">
-            <h2 class="text-lg font-bold">학생별 결과지 (메일머지) 미리보기</h2>
+            <h2 class="text-lg font-bold">학생별 결과지 미리보기</h2>
             <div class="space-x-2">
                 <button id="btnPrint" class="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded font-bold">🖨️ 인쇄하기 (A4)</button>
                 <button id="btnBack" class="bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded font-bold">돌아가기</button>
@@ -175,9 +178,47 @@
     </div>
 
     <script>
+        const STANDARD_W = 893;
+        const STANDARD_H = 1262;
+
+        const MARKER_TARGETS = {
+            tl: { x: 48, y: 68 },
+            tr: { x: 843, y: 68 },
+            bl: { x: 58, y: 1204 },
+            br: { x: 852, y: 1204 }
+        };
+
+        const TEMPLATE_CONFIGS = {
+            new20: {
+                label: '양식 기본형',
+                objCount: 16,
+                subjCount: 4,
+                objPoint: 5,
+                subjLabels: [17, 18, 19, 20],
+                oxLength: 20
+            },
+            newA: {
+                label: '양식 A형',
+                objCount: 18,
+                subjCount: 7,
+                objPoint: 4,
+                subjLabels: [19, 20, 21, 22, 23, 24, 25],
+                oxLength: 25
+            },
+            newB: {
+                label: '양식 B형',
+                objCount: 21,
+                subjCount: 4,
+                objPoint: 4,
+                subjLabels: [22, 23, 24, 25],
+                oxLength: 25
+            }
+        };
+
         const subjectNameInput = document.getElementById('subjectName');
         const objCountInput = document.getElementById('objCount');
         const subjCountInput = document.getElementById('subjCount');
+        const thresholdInput = document.getElementById('thresholdInput');
         const answerTable = document.getElementById('answerTable');
         const rosterInput = document.getElementById('rosterInput');
         const imageUpload = document.getElementById('imageUpload');
@@ -208,6 +249,17 @@
                 .replaceAll('>', '&gt;')
                 .replaceAll('"', '&quot;')
                 .replaceAll("'", '&#039;');
+        }
+
+        function getCurrentTemplate() {
+            return TEMPLATE_CONFIGS[formTypeSelect.value] || TEMPLATE_CONFIGS.new20;
+        }
+
+        function syncTemplateInputs() {
+            const tpl = getCurrentTemplate();
+            objCountInput.value = tpl.objCount;
+            subjCountInput.value = tpl.subjCount;
+            renderAnswerTable();
         }
 
         function renderAnswerTable() {
@@ -255,33 +307,19 @@
             }
         }
 
-        formTypeSelect.addEventListener('change', (e) => {
-            if (e.target.value === '20q') {
-                objCountInput.value = 16;
-                subjCountInput.value = 4;
-            } else if (e.target.value === '25q') {
-                objCountInput.value = 21;
-                subjCountInput.value = 4;
-            }
-
-            renderAnswerTable();
+        formTypeSelect.addEventListener('change', async () => {
+            syncTemplateInputs();
 
             if (originalImage) {
-                globalProcessedImageData = null;
-                mainCanvas.width = originalImage.width;
-                mainCanvas.height = originalImage.height;
-                ctx.drawImage(originalImage, 0, 0, mainCanvas.width, mainCanvas.height);
-                drawROIBoxes();
+                await previewImageWithCurrentTemplate(originalImage);
             }
         });
-
-        objCountInput.addEventListener('change', renderAnswerTable);
 
         document.getElementById('btnClearAnswers').addEventListener('click', () => {
             document.querySelectorAll('.answer-input').forEach(input => input.value = '');
         });
 
-        document.addEventListener('DOMContentLoaded', renderAnswerTable);
+        document.addEventListener('DOMContentLoaded', syncTemplateInputs);
 
         imageUpload.addEventListener('change', async (e) => {
             selectedFiles = Array.from(e.target.files);
@@ -305,12 +343,8 @@
                 reader.onload = (event) => {
                     originalImage = new Image();
 
-                    originalImage.onload = () => {
-                        globalProcessedImageData = null;
-                        mainCanvas.width = originalImage.width;
-                        mainCanvas.height = originalImage.height;
-                        ctx.drawImage(originalImage, 0, 0, mainCanvas.width, mainCanvas.height);
-                        drawROIBoxes();
+                    originalImage.onload = async () => {
+                        await previewImageWithCurrentTemplate(originalImage);
                     };
 
                     originalImage.src = event.target.result;
@@ -322,6 +356,20 @@
                 globalProcessedImageData = null;
             }
         });
+
+        async function previewImageWithCurrentTemplate(img) {
+            try {
+                const rectified = rectifyImageWithMarkers(img);
+                mainCanvas.width = STANDARD_W;
+                mainCanvas.height = STANDARD_H;
+                ctx.drawImage(rectified.canvas, 0, 0);
+                applyBinarization();
+                ctx.putImageData(globalProcessedImageData, 0, 0);
+                drawROIBoxes();
+            } catch (e) {
+                console.error('미리보기 보정 실패:', e);
+            }
+        }
 
         btnProcess.addEventListener('click', async () => {
             btnProcess.disabled = true;
@@ -337,6 +385,9 @@
             csvOutput.value = '';
             btnViewReports.classList.add('hidden');
 
+            const tpl = getCurrentTemplate();
+            const objCount = tpl.objCount;
+            const subjCount = tpl.subjCount;
             const answerInputs = document.querySelectorAll('.answer-input[data-type="obj"]');
             const answerKey = Array.from(answerInputs)
                 .map(input => parseInt(input.value))
@@ -362,8 +413,6 @@
                 }
             });
 
-            // ✅ 명부 기반 학반 보정용 인덱스
-            // 예: 스캔이 3반 15번으로 잘못 읽혀도, 명부에 15번이 1반에만 있으면 1반 15번으로 보정
             const rosterKeySet = new Set();
             const rosterNumToClasses = new Map();
 
@@ -405,35 +454,37 @@
                 }
 
                 const totalPages = processingQueue.length;
-                const objCount = parseInt(objCountInput.value) || 16;
-                const subjCount = parseInt(subjCountInput.value) || 4;
-                const startSubjNum = objCount + 1;
-
                 let scannedResultsMap = {};
                 let duplicateList = [];
                 let unreadablePages = [];
+                let markerFailPages = [];
 
                 for (let i = 0; i < totalPages; i++) {
                     const item = processingQueue[i];
 
-                    progressText.innerText = `스캔 분석 중... (${i + 1}/${totalPages} 페이지)`;
+                    progressText.innerText = `마커 보정 및 스캔 중... (${i + 1}/${totalPages} 페이지)`;
 
-                    mainCanvas.width = item.img.width;
-                    mainCanvas.height = item.img.height;
-                    ctx.drawImage(item.img, 0, 0, mainCanvas.width, mainCanvas.height);
+                    const rectified = rectifyImageWithMarkers(item.img);
+
+                    if (!rectified.ok) {
+                        markerFailPages.push(item.name);
+                    }
+
+                    mainCanvas.width = STANDARD_W;
+                    mainCanvas.height = STANDARD_H;
+                    ctx.drawImage(rectified.canvas, 0, 0);
 
                     applyBinarization();
 
-                    const rawData = performRealOMR(objCount, subjCount);
+                    const rawData = performRealOMR();
 
-                    let fCls = rawData[0];
-                    const fNum = rawData[1];
+                    let fCls = rawData.classNum;
+                    const fNum = rawData.studentNum;
 
-                    // ✅ 명부가 있으면 학반 오인식을 명부 기준으로 보정
                     fCls = correctClassByRoster(fCls, fNum);
 
-                    const objAns = rawData.slice(2, 2 + objCount);
-                    const subSc = rawData.slice(2 + objCount);
+                    const objAns = rawData.objAnswers;
+                    const subSc = rawData.subScores;
 
                     if (fCls > 0 && fNum > 0) {
                         const key = `${fCls}-${fNum}`;
@@ -454,7 +505,7 @@
                     ctx.putImageData(globalProcessedImageData, 0, 0);
                     drawROIBoxes();
 
-                    await new Promise(r => setTimeout(r, 50));
+                    await new Promise(r => setTimeout(r, 30));
                 }
 
                 let tsvData = [];
@@ -469,7 +520,7 @@
                             processAndPushStudentData(student.c, student.n, student.name, scanData.objAns, scanData.subSc);
                             delete scannedResultsMap[key];
                         } else {
-                            tsvData.push([student.c, student.n, student.name, subjectName, '결시', ' '.repeat(25), ''].join('\t'));
+                            tsvData.push([student.c, student.n, student.name, subjectName, '결시', ' '.repeat(tpl.oxLength), ''].join('\t'));
                         }
                     });
                 }
@@ -485,12 +536,10 @@
                     let objCorr = [];
                     let wrongNums = [];
 
-                    const pointPerObj = (formTypeSelect.value === '25q') ? 4 : 5;
-
                     if (hasAnswerKey) {
                         for (let q = 0; q < objCount; q++) {
                             if (objAns[q] === answerKey[q] && answerKey[q] !== 0) {
-                                objScore += pointPerObj;
+                                objScore += tpl.objPoint;
                                 objCorr.push('O');
                             } else {
                                 objCorr.push('X');
@@ -504,11 +553,13 @@
                     let subjCorr = [];
 
                     for (let i = 0; i < safeSubSc.length; i++) {
+                        const labelNum = tpl.subjLabels[i] || (objCount + i + 1);
+
                         if (safeSubSc[i] > 0) {
                             subjCorr.push('O');
                         } else {
                             subjCorr.push('X');
-                            wrongNums.push(startSubjNum + i);
+                            wrongNums.push(labelNum);
                         }
                     }
 
@@ -516,7 +567,7 @@
                     const totalScore = objScore + subjTotal;
 
                     let oxString = (hasAnswerKey ? objCorr.join('') : objAns.join('')) + subjCorr.join('');
-                    oxString = oxString.padEnd(25, ' ');
+                    oxString = oxString.padEnd(tpl.oxLength, ' ');
 
                     const wrongString = wrongNums.join(', ');
 
@@ -535,11 +586,17 @@
                         subjTotal,
                         totalScore,
                         objCount,
-                        startSubjNum
+                        subjLabels: tpl.subjLabels,
+                        templateLabel: tpl.label
                     });
                 }
 
                 let finalMessage = '채점 및 명부 매칭이 완료되었습니다!';
+
+                if (markerFailPages.length > 0) {
+                    finalMessage += ` / 마커 미검출 보정실패: ${markerFailPages.length}페이지`;
+                    console.warn('마커 미검출 페이지:', markerFailPages);
+                }
 
                 if (duplicateList.length > 0) {
                     finalMessage += ` / 중복 스캔: ${duplicateList.join(', ')}`;
@@ -588,6 +645,8 @@
                             <div class="text-lg font-bold">${s.classNum}반 ${s.studentNum}번 ${safeName ? `(${safeName})` : ''}</div>
                         </div>
 
+                        <div class="text-xs text-gray-500 mb-2">${escapeHTML(s.templateLabel || '')}</div>
+
                         <div class="flex justify-around bg-blue-50 p-4 rounded-lg mb-4">
                             <div class="text-center">
                                 <b>총점</b><br>
@@ -608,10 +667,10 @@
                             </div>
 
                             <div>
-                                <h4 class="font-bold text-sm bg-purple-100 p-1 mb-2 text-center">주관식</h4>
+                                <h4 class="font-bold text-sm bg-purple-100 p-1 mb-2 text-center">점수형 문항</h4>
                                 ${s.subjScores.map((sc, i) => `
                                     <div class="flex justify-between text-xs border-b">
-                                        <span>${s.objCount + i + 1}번</span>
+                                        <span>${s.subjLabels[i] || (s.objCount + i + 1)}번</span>
                                         <span class="font-bold text-purple-600">${sc}점</span>
                                     </div>
                                 `).join('')}
@@ -693,13 +752,328 @@
             });
         }
 
+        function createCanvasFromImage(img) {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+
+            const c = canvas.getContext('2d', { willReadFrequently: true });
+            c.drawImage(img, 0, 0);
+
+            return canvas;
+        }
+
+        function rectifyImageWithMarkers(img) {
+            const srcCanvas = createCanvasFromImage(img);
+            const srcCtx = srcCanvas.getContext('2d', { willReadFrequently: true });
+            const srcImageData = srcCtx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
+
+            const markers = findMarkers(srcImageData, srcCanvas.width, srcCanvas.height);
+
+            if (!markers) {
+                const fallback = document.createElement('canvas');
+                fallback.width = STANDARD_W;
+                fallback.height = STANDARD_H;
+
+                const fctx = fallback.getContext('2d', { willReadFrequently: true });
+                fctx.fillStyle = 'white';
+                fctx.fillRect(0, 0, STANDARD_W, STANDARD_H);
+                fctx.drawImage(srcCanvas, 0, 0, STANDARD_W, STANDARD_H);
+
+                return {
+                    ok: false,
+                    canvas: fallback
+                };
+            }
+
+            const dstPts = [
+                MARKER_TARGETS.tl,
+                MARKER_TARGETS.tr,
+                MARKER_TARGETS.bl,
+                MARKER_TARGETS.br
+            ];
+
+            const srcPts = [
+                markers.tl,
+                markers.tr,
+                markers.bl,
+                markers.br
+            ];
+
+            const warped = warpPerspective(srcImageData, srcCanvas.width, srcCanvas.height, dstPts, srcPts, STANDARD_W, STANDARD_H);
+
+            return {
+                ok: true,
+                canvas: warped
+            };
+        }
+
+        function isDarkPixel(data, idx, threshold = 90) {
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+            return lum < threshold;
+        }
+
+        function findMarkers(imageData, w, h) {
+            const data = imageData.data;
+
+            const rois = {
+                tl: { x0: 0, y0: 0, x1: Math.floor(w * 0.22), y1: Math.floor(h * 0.18), cornerX: 0, cornerY: 0 },
+                tr: { x0: Math.floor(w * 0.78), y0: 0, x1: w, y1: Math.floor(h * 0.18), cornerX: w, cornerY: 0 },
+                bl: { x0: 0, y0: Math.floor(h * 0.82), x1: Math.floor(w * 0.22), y1: h, cornerX: 0, cornerY: h },
+                br: { x0: Math.floor(w * 0.78), y0: Math.floor(h * 0.82), x1: w, y1: h, cornerX: w, cornerY: h }
+            };
+
+            const result = {};
+
+            for (const key in rois) {
+                const marker = findMarkerInROI(imageData, w, h, rois[key]);
+
+                if (!marker) {
+                    console.warn('마커 미검출:', key);
+                    return null;
+                }
+
+                result[key] = marker;
+            }
+
+            return result;
+        }
+
+        function findMarkerInROI(imageData, w, h, roi) {
+            const data = imageData.data;
+            const roiW = roi.x1 - roi.x0;
+            const roiH = roi.y1 - roi.y0;
+
+            if (roiW <= 0 || roiH <= 0) {
+                return null;
+            }
+
+            const visited = new Uint8Array(roiW * roiH);
+            const minDim = Math.min(w, h);
+            const minSize = Math.max(6, minDim * 0.006);
+            const maxSize = Math.max(40, minDim * 0.06);
+
+            let best = null;
+
+            function localIndex(x, y) {
+                return (y - roi.y0) * roiW + (x - roi.x0);
+            }
+
+            for (let y = roi.y0; y < roi.y1; y++) {
+                for (let x = roi.x0; x < roi.x1; x++) {
+                    const li = localIndex(x, y);
+
+                    if (visited[li]) continue;
+
+                    const idx = (y * w + x) * 4;
+
+                    if (!isDarkPixel(data, idx, 90)) {
+                        visited[li] = 1;
+                        continue;
+                    }
+
+                    const stack = [[x, y]];
+                    visited[li] = 1;
+
+                    let area = 0;
+                    let minX = x;
+                    let maxX = x;
+                    let minY = y;
+                    let maxY = y;
+
+                    while (stack.length > 0) {
+                        const [cx, cy] = stack.pop();
+                        area++;
+
+                        if (cx < minX) minX = cx;
+                        if (cx > maxX) maxX = cx;
+                        if (cy < minY) minY = cy;
+                        if (cy > maxY) maxY = cy;
+
+                        const neighbors = [
+                            [cx + 1, cy],
+                            [cx - 1, cy],
+                            [cx, cy + 1],
+                            [cx, cy - 1]
+                        ];
+
+                        for (const [nx, ny] of neighbors) {
+                            if (nx < roi.x0 || nx >= roi.x1 || ny < roi.y0 || ny >= roi.y1) continue;
+
+                            const nli = localIndex(nx, ny);
+                            if (visited[nli]) continue;
+
+                            visited[nli] = 1;
+
+                            const nidx = (ny * w + nx) * 4;
+
+                            if (isDarkPixel(data, nidx, 90)) {
+                                stack.push([nx, ny]);
+                            }
+                        }
+                    }
+
+                    const bw = maxX - minX + 1;
+                    const bh = maxY - minY + 1;
+                    const aspect = bw / Math.max(1, bh);
+                    const fill = area / Math.max(1, bw * bh);
+
+                    if (bw < minSize || bh < minSize) continue;
+                    if (bw > maxSize || bh > maxSize) continue;
+                    if (aspect < 0.65 || aspect > 1.55) continue;
+                    if (fill < 0.45) continue;
+
+                    const centerX = (minX + maxX) / 2;
+                    const centerY = (minY + maxY) / 2;
+                    const dist = Math.hypot(centerX - roi.cornerX, centerY - roi.cornerY);
+
+                    const score = dist + (1 - fill) * 60;
+
+                    if (!best || score < best.score) {
+                        best = {
+                            x: centerX,
+                            y: centerY,
+                            score,
+                            area,
+                            fill,
+                            bbox: { x: minX, y: minY, w: bw, h: bh }
+                        };
+                    }
+                }
+            }
+
+            return best ? { x: best.x, y: best.y } : null;
+        }
+
+        function solveLinearSystem(A, b) {
+            const n = b.length;
+
+            for (let i = 0; i < n; i++) {
+                let maxRow = i;
+
+                for (let r = i + 1; r < n; r++) {
+                    if (Math.abs(A[r][i]) > Math.abs(A[maxRow][i])) {
+                        maxRow = r;
+                    }
+                }
+
+                if (maxRow !== i) {
+                    const tmp = A[i];
+                    A[i] = A[maxRow];
+                    A[maxRow] = tmp;
+
+                    const tb = b[i];
+                    b[i] = b[maxRow];
+                    b[maxRow] = tb;
+                }
+
+                const pivot = A[i][i];
+
+                if (Math.abs(pivot) < 1e-12) {
+                    throw new Error('Homography 계산 실패: pivot is zero');
+                }
+
+                for (let c = i; c < n; c++) {
+                    A[i][c] /= pivot;
+                }
+
+                b[i] /= pivot;
+
+                for (let r = 0; r < n; r++) {
+                    if (r === i) continue;
+
+                    const factor = A[r][i];
+
+                    for (let c = i; c < n; c++) {
+                        A[r][c] -= factor * A[i][c];
+                    }
+
+                    b[r] -= factor * b[i];
+                }
+            }
+
+            return b;
+        }
+
+        function computeHomography(fromPts, toPts) {
+            const A = [];
+            const b = [];
+
+            for (let i = 0; i < 4; i++) {
+                const X = fromPts[i].x;
+                const Y = fromPts[i].y;
+                const x = toPts[i].x;
+                const y = toPts[i].y;
+
+                A.push([X, Y, 1, 0, 0, 0, -x * X, -x * Y]);
+                b.push(x);
+
+                A.push([0, 0, 0, X, Y, 1, -y * X, -y * Y]);
+                b.push(y);
+            }
+
+            const h = solveLinearSystem(A, b);
+
+            return [
+                h[0], h[1], h[2],
+                h[3], h[4], h[5],
+                h[6], h[7], 1
+            ];
+        }
+
+        function warpPerspective(srcImageData, srcW, srcH, dstPts, srcPts, dstW, dstH) {
+            const H = computeHomography(dstPts, srcPts);
+            const src = srcImageData.data;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = dstW;
+            canvas.height = dstH;
+
+            const c = canvas.getContext('2d', { willReadFrequently: true });
+            const out = c.createImageData(dstW, dstH);
+            const dst = out.data;
+
+            for (let y = 0; y < dstH; y++) {
+                for (let x = 0; x < dstW; x++) {
+                    const denom = H[6] * x + H[7] * y + H[8];
+                    const sx = (H[0] * x + H[1] * y + H[2]) / denom;
+                    const sy = (H[3] * x + H[4] * y + H[5]) / denom;
+
+                    const di = (y * dstW + x) * 4;
+
+                    if (sx >= 0 && sx < srcW && sy >= 0 && sy < srcH) {
+                        const isx = Math.max(0, Math.min(srcW - 1, Math.round(sx)));
+                        const isy = Math.max(0, Math.min(srcH - 1, Math.round(sy)));
+                        const si = (isy * srcW + isx) * 4;
+
+                        dst[di] = src[si];
+                        dst[di + 1] = src[si + 1];
+                        dst[di + 2] = src[si + 2];
+                        dst[di + 3] = 255;
+                    } else {
+                        dst[di] = 255;
+                        dst[di + 1] = 255;
+                        dst[di + 2] = 255;
+                        dst[di + 3] = 255;
+                    }
+                }
+            }
+
+            c.putImageData(out, 0, 0);
+            return canvas;
+        }
+
         function applyBinarization() {
+            const threshold = Math.max(80, Math.min(220, parseInt(thresholdInput.value) || 145));
             const imgData = ctx.getImageData(0, 0, mainCanvas.width, mainCanvas.height);
             const data = imgData.data;
 
             for (let i = 0; i < data.length; i += 4) {
                 const b = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-                const c = b < 130 ? 0 : 255;
+                const c = b < threshold ? 0 : 255;
 
                 data[i] = c;
                 data[i + 1] = c;
@@ -709,200 +1083,156 @@
             globalProcessedImageData = imgData;
         }
 
-        function getRegions(w, h, type) {
-            if (type === '25q') {
+        function getRegions(type) {
+            const common = {
+                classGrid: {
+                    x: 323,
+                    y: 146,
+                    w: 92,
+                    h: 26,
+                    r: 1,
+                    c: 3
+                },
+
+                numTen: {
+                    x: 323,
+                    y: 171,
+                    w: 92,
+                    h: 24,
+                    r: 1,
+                    c: 3
+                },
+
+                numOne: {
+                    x: 323,
+                    y: 196,
+                    w: 276,
+                    h: 24,
+                    r: 1,
+                    c: 10
+                },
+
+                objLeft10: {
+                    x: 176,
+                    y: 281,
+                    w: 205,
+                    h: 450,
+                    r: 10,
+                    c: 5
+                },
+
+                objRight6: {
+                    x: 582,
+                    y: 281,
+                    w: 205,
+                    h: 270,
+                    r: 6,
+                    c: 5
+                },
+
+                objRight8: {
+                    x: 582,
+                    y: 281,
+                    w: 205,
+                    h: 360,
+                    r: 8,
+                    c: 5
+                },
+
+                objRight11: {
+                    x: 582,
+                    y: 281,
+                    w: 205,
+                    h: 495,
+                    r: 11,
+                    c: 5
+                },
+
+                short19to21: {
+                    x: 747,
+                    y: 633,
+                    w: 88,
+                    h: 142,
+                    r: 3,
+                    c: 2
+                },
+
+                scoreLT: {
+                    x: 158,
+                    y: 944,
+                    w: 222,
+                    h: 40,
+                    r: 1,
+                    c: 6
+                },
+
+                scoreRT: {
+                    x: 570,
+                    y: 944,
+                    w: 222,
+                    h: 40,
+                    r: 1,
+                    c: 6
+                },
+
+                scoreLB: {
+                    x: 158,
+                    y: 1138,
+                    w: 222,
+                    h: 40,
+                    r: 1,
+                    c: 6
+                },
+
+                scoreRB: {
+                    x: 570,
+                    y: 1138,
+                    w: 222,
+                    h: 40,
+                    r: 1,
+                    c: 6
+                }
+            };
+
+            if (type === 'new20') {
                 return {
-                    classNum1: {
-                        x: w * 0.338,
-                        y: h * 0.111,
-                        w: w * 0.026,
-                        h: h * 0.023,
-                        r: 1,
-                        c: 1
-                    },
+                    classGrid: common.classGrid,
+                    numTen: common.numTen,
+                    numOne: common.numOne,
+                    objLeft10: common.objLeft10,
+                    objRight6: common.objRight6,
+                    score17: common.scoreLT,
+                    score18: common.scoreRT,
+                    score19: common.scoreLB,
+                    score20: common.scoreRB
+                };
+            }
 
-                    classNum2: {
-                        x: w * 0.410,
-                        y: h * 0.111,
-                        w: w * 0.026,
-                        h: h * 0.023,
-                        r: 1,
-                        c: 1
-                    },
-
-                    classNum3: {
-                        x: w * 0.472,
-                        y: h * 0.111,
-                        w: w * 0.026,
-                        h: h * 0.023,
-                        r: 1,
-                        c: 1
-                    },
-
-                    studentNum: {
-                        x: w * 0.210,
-                        y: h * 0.138,
-                        w: w * 0.718,
-                        h: h * 0.022,
-                        r: 1,
-                        c: 29
-                    },
-
-                    obj1: {
-                        x: w * 0.177,
-                        y: h * 0.227,
-                        w: w * 0.252,
-                        h: h * 0.355,
-                        r: 10,
-                        c: 5
-                    },
-
-                    obj2: {
-                        x: w * 0.628,
-                        y: h * 0.227,
-                        w: w * 0.252,
-                        h: h * 0.355,
-                        r: 10,
-                        c: 5
-                    },
-
-                    obj3: {
-                        x: w * 0.628,
-                        y: h * 0.582,
-                        w: w * 0.252,
-                        h: h * 0.036,
-                        r: 1,
-                        c: 5
-                    },
-
-                    subj22: {
-                        x: w * 0.147,
-                        y: h * 0.767,
-                        w: w * 0.300,
-                        h: h * 0.036,
-                        r: 1,
-                        c: 6
-                    },
-
-                    subj23: {
-                        x: w * 0.600,
-                        y: h * 0.767,
-                        w: w * 0.304,
-                        h: h * 0.036,
-                        r: 1,
-                        c: 6
-                    },
-
-                    subj24: {
-                        x: w * 0.147,
-                        y: h * 0.916,
-                        w: w * 0.300,
-                        h: h * 0.036,
-                        r: 1,
-                        c: 6
-                    },
-
-                    subj25: {
-                        x: w * 0.598,
-                        y: h * 0.916,
-                        w: w * 0.305,
-                        h: h * 0.036,
-                        r: 1,
-                        c: 6
-                    }
+            if (type === 'newA') {
+                return {
+                    classGrid: common.classGrid,
+                    numTen: common.numTen,
+                    numOne: common.numOne,
+                    objLeft10: common.objLeft10,
+                    objRight8: common.objRight8,
+                    short19to21: common.short19to21,
+                    score22: common.scoreLT,
+                    score23: common.scoreRT,
+                    score24: common.scoreLB,
+                    score25: common.scoreRB
                 };
             }
 
             return {
-                classNum1: {
-                    x: w * 0.323,
-                    y: h * 0.114,
-                    w: w * 0.030,
-                    h: h * 0.024,
-                    r: 1,
-                    c: 1
-                },
-
-                classNum2: {
-                    x: w * 0.397,
-                    y: h * 0.114,
-                    w: w * 0.030,
-                    h: h * 0.024,
-                    r: 1,
-                    c: 1
-                },
-
-                classNum3: {
-                    x: w * 0.468,
-                    y: h * 0.114,
-                    w: w * 0.030,
-                    h: h * 0.024,
-                    r: 1,
-                    c: 1
-                },
-
-                studentNum: {
-                    x: w * 0.202,
-                    y: h * 0.137,
-                    w: w * 0.720,
-                    h: h * 0.025,
-                    r: 1,
-                    c: 29
-                },
-
-                obj1: {
-                    x: w * 0.158,
-                    y: h * 0.228,
-                    w: w * 0.258,
-                    h: h * 0.352,
-                    r: 10,
-                    c: 5
-                },
-
-                obj2: {
-                    x: w * 0.615,
-                    y: h * 0.228,
-                    w: w * 0.258,
-                    h: h * 0.352,
-                    r: 10,
-                    c: 5
-                },
-
-                subj17: {
-                    x: w * 0.145,
-                    y: h * 0.755,
-                    w: w * 0.298,
-                    h: h * 0.025,
-                    r: 1,
-                    c: 6
-                },
-
-                subj18: {
-                    x: w * 0.590,
-                    y: h * 0.755,
-                    w: w * 0.298,
-                    h: h * 0.025,
-                    r: 1,
-                    c: 6
-                },
-
-                subj19: {
-                    x: w * 0.145,
-                    y: h * 0.925,
-                    w: w * 0.298,
-                    h: h * 0.025,
-                    r: 1,
-                    c: 6
-                },
-
-                subj20: {
-                    x: w * 0.590,
-                    y: h * 0.925,
-                    w: w * 0.298,
-                    h: h * 0.025,
-                    r: 1,
-                    c: 6
-                }
+                classGrid: common.classGrid,
+                numTen: common.numTen,
+                numOne: common.numOne,
+                objLeft10: common.objLeft10,
+                objRight11: common.objRight11,
+                score22: common.scoreLT,
+                score23: common.scoreRT,
+                score24: common.scoreLB,
+                score25: common.scoreRB
             };
         }
 
@@ -944,53 +1274,11 @@
             return black / total;
         }
 
-        function calculateRegionDarknessInner(reg, marginXRatio = 0.32, marginYRatio = 0.30) {
-            const mx = reg.w * marginXRatio;
-            const my = reg.h * marginYRatio;
-
-            return calculateDarkness(
-                reg.x + mx,
-                reg.y + my,
-                reg.w - mx * 2,
-                reg.h - my * 2
-            );
+        function scanGridRegion(reg, threshold = 0.10) {
+            return scanGrid(reg.x, reg.y, reg.w, reg.h, reg.r, reg.c, threshold);
         }
 
-        function scanClassNumber(r) {
-            const choices = [
-                {
-                    num: 1,
-                    darkness: calculateRegionDarknessInner(r.classNum1)
-                },
-                {
-                    num: 2,
-                    darkness: calculateRegionDarknessInner(r.classNum2)
-                },
-                {
-                    num: 3,
-                    darkness: calculateRegionDarknessInner(r.classNum3)
-                }
-            ];
-
-            choices.sort((a, b) => b.darkness - a.darkness);
-
-            const first = choices[0];
-            const second = choices[1];
-
-            console.log('학반 인식값:', choices);
-
-            if (first.darkness < 0.16) {
-                return 0;
-            }
-
-            if (first.darkness < second.darkness * 1.18) {
-                return 0;
-            }
-
-            return first.num;
-        }
-
-        function scanGrid(startX, startY, width, height, rows, cols) {
+        function scanGrid(startX, startY, width, height, rows, cols, threshold = 0.10) {
             const res = [];
             const cW = width / cols;
             const cH = height / rows;
@@ -1013,81 +1301,120 @@
                     }
                 }
 
-                res.push(maxD < 0.10 ? -1 : bestC);
+                res.push(maxD < threshold ? -1 : bestC);
             }
 
             return res;
         }
 
-        function performRealOMR(oC, sC) {
-            const currentType = formTypeSelect.value;
-            const r = getRegions(mainCanvas.width, mainCanvas.height, currentType);
+        function mapShortScore(v) {
+            if (v === 1) return 4;
+            return 0;
+        }
 
-            const cls = scanClassNumber(r);
+        function performRealOMR() {
+            const type = formTypeSelect.value;
+            const r = getRegions(type);
 
-            const sn = scanGrid(r.studentNum.x, r.studentNum.y, r.studentNum.w, r.studentNum.h, 1, 29);
-            const studentNumber = sn[0] === -1 ? 0 : sn[0] + 1;
+            const classIdx = scanGridRegion(r.classGrid, 0.10)[0];
+            const classNum = classIdx === -1 ? 0 : classIdx + 1;
 
-            if (currentType === '25q') {
-                const o1 = scanGrid(r.obj1.x, r.obj1.y, r.obj1.w, r.obj1.h, 10, 5);
-                const o2 = scanGrid(r.obj2.x, r.obj2.y, r.obj2.w, r.obj2.h, 10, 5);
-                const o3 = scanGrid(r.obj3.x, r.obj3.y, r.obj3.w, r.obj3.h, 1, 5);
+            const tenIdx = scanGridRegion(r.numTen, 0.10)[0];
+            const oneIdx = scanGridRegion(r.numOne, 0.10)[0];
 
-                const s22 = scanGrid(r.subj22.x, r.subj22.y, r.subj22.w, r.subj22.h, 1, 6);
-                const s23 = scanGrid(r.subj23.x, r.subj23.y, r.subj23.w, r.subj23.h, 1, 6);
-                const s24 = scanGrid(r.subj24.x, r.subj24.y, r.subj24.w, r.subj24.h, 1, 6);
-                const s25 = scanGrid(r.subj25.x, r.subj25.y, r.subj25.w, r.subj25.h, 1, 6);
+            const tens = tenIdx === -1 ? 0 : tenIdx;
+            const ones = oneIdx === -1 ? -1 : oneIdx;
 
-                const allObj = [...o1, ...o2, ...o3]
-                    .slice(0, oC)
-                    .map(v => v === -1 ? 0 : v + 1);
+            let studentNum = ones === -1 ? 0 : tens * 10 + ones;
 
-                const allSubj = [s22[0], s23[0], s24[0], s25[0]]
-                    .slice(0, sC);
-
-                return [cls, studentNumber, ...allObj, ...allSubj];
+            if (studentNum < 1 || studentNum > 29) {
+                studentNum = 0;
             }
 
-            const o1 = scanGrid(r.obj1.x, r.obj1.y, r.obj1.w, r.obj1.h, 10, 5);
-            const o2 = scanGrid(r.obj2.x, r.obj2.y, r.obj2.w, r.obj2.h, 10, 5);
+            if (type === 'new20') {
+                const o1 = scanGridRegion(r.objLeft10);
+                const o2 = scanGridRegion(r.objRight6);
 
-            const s17 = scanGrid(r.subj17.x, r.subj17.y, r.subj17.w, r.subj17.h, 1, 6);
-            const s18 = scanGrid(r.subj18.x, r.subj18.y, r.subj18.w, r.subj18.h, 1, 6);
-            const s19 = scanGrid(r.subj19.x, r.subj19.y, r.subj19.w, r.subj19.h, 1, 6);
-            const s20 = scanGrid(r.subj20.x, r.subj20.y, r.subj20.w, r.subj20.h, 1, 6);
+                const objAnswers = [...o1, ...o2].map(v => v === -1 ? 0 : v + 1);
 
-            const allObj = [...o1, ...o2]
-                .slice(0, oC)
-                .map(v => v === -1 ? 0 : v + 1);
+                const s17 = scanGridRegion(r.score17);
+                const s18 = scanGridRegion(r.score18);
+                const s19 = scanGridRegion(r.score19);
+                const s20 = scanGridRegion(r.score20);
 
-            const allSubj = [s17[0], s18[0], s19[0], s20[0]]
-                .slice(0, sC);
+                const subScores = [s17[0], s18[0], s19[0], s20[0]];
 
-            return [cls, studentNumber, ...allObj, ...allSubj];
+                return {
+                    classNum,
+                    studentNum,
+                    objAnswers,
+                    subScores
+                };
+            }
+
+            if (type === 'newA') {
+                const o1 = scanGridRegion(r.objLeft10);
+                const o2 = scanGridRegion(r.objRight8);
+
+                const objAnswers = [...o1, ...o2].map(v => v === -1 ? 0 : v + 1);
+
+                const shorts = scanGridRegion(r.short19to21);
+                const s22 = scanGridRegion(r.score22);
+                const s23 = scanGridRegion(r.score23);
+                const s24 = scanGridRegion(r.score24);
+                const s25 = scanGridRegion(r.score25);
+
+                const subScores = [
+                    mapShortScore(shorts[0]),
+                    mapShortScore(shorts[1]),
+                    mapShortScore(shorts[2]),
+                    s22[0],
+                    s23[0],
+                    s24[0],
+                    s25[0]
+                ];
+
+                return {
+                    classNum,
+                    studentNum,
+                    objAnswers,
+                    subScores
+                };
+            }
+
+            const o1 = scanGridRegion(r.objLeft10);
+            const o2 = scanGridRegion(r.objRight11);
+
+            const objAnswers = [...o1, ...o2].map(v => v === -1 ? 0 : v + 1);
+
+            const s22 = scanGridRegion(r.score22);
+            const s23 = scanGridRegion(r.score23);
+            const s24 = scanGridRegion(r.score24);
+            const s25 = scanGridRegion(r.score25);
+
+            const subScores = [s22[0], s23[0], s24[0], s25[0]];
+
+            return {
+                classNum,
+                studentNum,
+                objAnswers,
+                subScores
+            };
         }
 
         function drawROIBoxes() {
-            const currentType = formTypeSelect.value;
-            const w = mainCanvas.width;
-            const h = mainCanvas.height;
+            const r = getRegions(formTypeSelect.value);
 
-            if (!w || !h) return;
+            ctx.lineWidth = 1.2;
 
-            const r = getRegions(w, h, currentType);
-
-            ctx.lineWidth = Math.max(1, w * 0.001);
-
-            if (globalProcessedImageData) {
-                ctx.putImageData(globalProcessedImageData, 0, 0);
-            }
-
-            for (const key in r) {
+            const drawReg = (key, color = 'rgba(59, 130, 246, 0.9)') => {
                 const reg = r[key];
+                if (!reg) return;
 
-                ctx.strokeStyle = 'rgba(59, 130, 246, 0.9)';
+                ctx.strokeStyle = color;
                 ctx.strokeRect(reg.x, reg.y, reg.w, reg.h);
 
-                ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)';
+                ctx.strokeStyle = 'rgba(59, 130, 246, 0.35)';
                 ctx.beginPath();
 
                 const cellW = reg.w / reg.c;
@@ -1104,7 +1431,17 @@
                 }
 
                 ctx.stroke();
-            }
+            };
+
+            Object.keys(r).forEach(key => drawReg(key));
+
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.9)';
+            ctx.lineWidth = 2;
+
+            const markerSize = 24;
+            Object.values(MARKER_TARGETS).forEach(p => {
+                ctx.strokeRect(p.x - markerSize / 2, p.y - markerSize / 2, markerSize, markerSize);
+            });
         }
     </script>
 </body>
