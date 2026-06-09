@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OMR 자동 채점 & 명부 연동 시스템 - 양식 마커 보정</title>
+    <title>OMR 자동 채점 & 명부 연동 시스템 - 신양식 마커 보정</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
@@ -73,7 +73,7 @@
         <div class="w-full md:w-1/3 flex flex-col gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-gray-800">OMR 자동 채점기</h1>
-                <p class="text-xs text-blue-600 mt-1 font-bold">✓ 양식 마커 보정 + 명부 연동 + 결시 처리 + 엑셀 정오표</p>
+                <p class="text-xs text-blue-600 mt-1 font-bold">✓ 신양식 마커 보정 + 연필 진하기 보정 + 명부 연동 + 확인필요 표시</p>
             </div>
 
             <div class="bg-blue-50 p-3 rounded-md border border-blue-100 flex flex-col gap-3">
@@ -87,9 +87,9 @@
                 <div>
                     <label class="block text-xs font-medium text-gray-700">OMR 양식 템플릿 선택</label>
                     <select id="formType" class="mt-1 w-full border border-blue-400 rounded p-1.5 text-sm font-bold text-blue-700 bg-blue-50 focus:outline-none">
-                        <option value="new20">양식 기본형 (총 20문항: 객16 + 주4 / 객관식 5점)</option>
-                        <option value="newA">양식 A형 (총 25문항: 객18 + 단답3 + 주4 / 객관식 4점)</option>
-                        <option value="newB">양식 B형 (총 25문항: 객21 + 주4 / 객관식 4점)</option>
+                        <option value="new20">신양식 기본형 (총 20문항: 객16 + 주4 / 객관식 5점)</option>
+                        <option value="newA">신양식 A형 (총 25문항: 객18 + 단답3 + 주4 / 객관식 4점)</option>
+                        <option value="newB">신양식 B형 (총 25문항: 객21 + 주4 / 객관식 4점)</option>
                     </select>
                 </div>
 
@@ -152,7 +152,7 @@
                 </h3>
 
                 <textarea id="csvOutput" class="w-full flex-grow min-h-[90px] text-xs p-2 border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none whitespace-pre" readonly></textarea>
-                <p class="text-[10px] text-gray-400 mt-2">* 엑셀의 빈 A1 셀에 바로 붙여넣기(Ctrl+V) 하세요.</p>
+                <p class="text-[10px] text-gray-400 mt-2">* 확인필요 문항은 스캔 이미지에서 직접 확인하세요.</p>
             </div>
         </div>
 
@@ -206,7 +206,7 @@
 
         const TEMPLATE_CONFIGS = {
             new20: {
-                label: '양식 기본형',
+                label: '신양식 기본형',
                 objCount: 16,
                 subjCount: 4,
                 objPoint: 5,
@@ -214,7 +214,7 @@
                 oxLength: 20
             },
             newA: {
-                label: '양식 A형',
+                label: '신양식 A형',
                 objCount: 18,
                 subjCount: 7,
                 objPoint: 4,
@@ -222,7 +222,7 @@
                 oxLength: 25
             },
             newB: {
-                label: '양식 B형',
+                label: '신양식 B형',
                 objCount: 21,
                 subjCount: 4,
                 objPoint: 4,
@@ -258,10 +258,10 @@
         let selectedFiles = [];
         let processingQueue = [];
         let globalProcessedImageData = null;
+        let globalRawImageData = null;
         let allStudentsData = [];
         let originalImage = null;
 
-        // ✅ 스캔 후 페이지별 미리보기 저장용
         let scanPreviewPages = [];
         let currentScanPreviewIndex = -1;
 
@@ -440,6 +440,7 @@
             } else {
                 originalImage = null;
                 globalProcessedImageData = null;
+                globalRawImageData = null;
             }
         });
 
@@ -572,6 +573,7 @@
 
                     const objAns = rawData.objAnswers;
                     const subSc = rawData.subScores;
+                    const reviewIssues = rawData.reviewIssues || [];
 
                     if (fCls > 0 && fNum > 0) {
                         const key = `${fCls}-${fNum}`;
@@ -583,6 +585,7 @@
                         scannedResultsMap[key] = {
                             objAns,
                             subSc,
+                            reviewIssues,
                             sourceName: item.name
                         };
                     } else {
@@ -598,7 +601,7 @@
                 }
 
                 let tsvData = [];
-                tsvData.push(['학반', '번호', '이름', '과목명', '점수', '정오표', '틀린문항'].join('\t'));
+                tsvData.push(['학반', '번호', '이름', '과목명', '점수', '정오표', '틀린문항', '확인필요'].join('\t'));
 
                 if (roster.length > 0) {
                     roster.forEach(student => {
@@ -606,10 +609,10 @@
                         const scanData = scannedResultsMap[key];
 
                         if (scanData) {
-                            processAndPushStudentData(student.c, student.n, student.name, scanData.objAns, scanData.subSc);
+                            processAndPushStudentData(student.c, student.n, student.name, scanData.objAns, scanData.subSc, scanData.reviewIssues);
                             delete scannedResultsMap[key];
                         } else {
-                            tsvData.push([student.c, student.n, student.name, subjectName, '결시', ' '.repeat(tpl.oxLength), ''].join('\t'));
+                            tsvData.push([student.c, student.n, student.name, subjectName, '결시', ' '.repeat(tpl.oxLength), '', ''].join('\t'));
                         }
                     });
                 }
@@ -617,13 +620,14 @@
                 for (const key in scannedResultsMap) {
                     const [c, n] = key.split('-').map(Number);
                     const scanData = scannedResultsMap[key];
-                    processAndPushStudentData(c, n, roster.length > 0 ? '명부없음' : '', scanData.objAns, scanData.subSc);
+                    processAndPushStudentData(c, n, roster.length > 0 ? '명부없음' : '', scanData.objAns, scanData.subSc, scanData.reviewIssues);
                 }
 
-                function processAndPushStudentData(c, n, name, objAns, subSc) {
+                function processAndPushStudentData(c, n, name, objAns, subSc, reviewIssues) {
                     let objScore = 0;
                     let objCorr = [];
                     let wrongNums = [];
+                    const reviewList = Array.isArray(reviewIssues) ? [...reviewIssues] : [];
 
                     if (hasAnswerKey) {
                         for (let q = 0; q < objCount; q++) {
@@ -659,8 +663,9 @@
                     oxString = oxString.padEnd(tpl.oxLength, ' ');
 
                     const wrongString = wrongNums.join(', ');
+                    const reviewString = Array.from(new Set(reviewList)).join(', ');
 
-                    tsvData.push([c, n, name, subjectName, totalScore, oxString, wrongString].join('\t'));
+                    tsvData.push([c, n, name, subjectName, totalScore, oxString, wrongString, reviewString].join('\t'));
 
                     allStudentsData.push({
                         classNum: c,
@@ -671,6 +676,7 @@
                         objCorrect: objCorr,
                         subjScores: safeSubSc,
                         subjCorrect: subjCorr,
+                        reviewIssues: reviewString,
                         objScore,
                         subjTotal,
                         totalScore,
@@ -739,6 +745,12 @@
                         </div>
 
                         <div class="text-xs text-gray-500 mb-2">${escapeHTML(s.templateLabel || '')}</div>
+
+                        ${s.reviewIssues ? `
+                            <div class="mb-3 p-2 rounded bg-yellow-50 border border-yellow-200 text-xs text-yellow-800">
+                                확인필요: ${escapeHTML(s.reviewIssues)}
+                            </div>
+                        ` : ''}
 
                         <div class="flex justify-around bg-blue-50 p-4 rounded-lg mb-4">
                             <div class="text-center">
@@ -1159,6 +1171,13 @@
         function applyBinarization() {
             const threshold = Math.max(80, Math.min(220, parseInt(thresholdInput.value) || 145));
             const imgData = ctx.getImageData(0, 0, mainCanvas.width, mainCanvas.height);
+
+            globalRawImageData = new ImageData(
+                new Uint8ClampedArray(imgData.data),
+                imgData.width,
+                imgData.height
+            );
+
             const data = imgData.data;
 
             for (let i = 0; i < data.length; i += 4) {
@@ -1362,21 +1381,25 @@
             };
         }
 
-        function calculateDarkness(x, y, w, h) {
-            let black = 0;
+        function calculateMarkScore(x, y, w, h) {
+            const imgData = globalRawImageData || globalProcessedImageData;
+
+            if (!imgData) {
+                return 0;
+            }
+
+            const data = imgData.data;
+            const canvasW = imgData.width;
+            const canvasH = imgData.height;
 
             x = Math.floor(x);
             y = Math.floor(y);
             w = Math.floor(w);
             h = Math.floor(h);
 
-            if (!globalProcessedImageData) {
-                return 0;
-            }
-
-            const data = globalProcessedImageData.data;
-            const canvasW = mainCanvas.width;
-            const canvasH = mainCanvas.height;
+            let darknessSum = 0;
+            let softDarkCount = 0;
+            let total = 0;
 
             for (let row = 0; row < h; row++) {
                 const py = y + row;
@@ -1389,45 +1412,97 @@
                     if (px < 0 || px >= canvasW) continue;
 
                     const idx = (py * canvasW + px) * 4;
+                    const r = data[idx];
+                    const g = data[idx + 1];
+                    const b = data[idx + 2];
+                    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
 
-                    if (data[idx] < 128) {
-                        black++;
+                    darknessSum += (255 - lum) / 255;
+
+                    if (lum < 210) {
+                        softDarkCount++;
                     }
+
+                    total++;
                 }
             }
 
-            const total = Math.max(1, w * h);
-            return black / total;
+            if (total === 0) {
+                return 0;
+            }
+
+            const avgDarkness = darknessSum / total;
+            const softDarkRatio = softDarkCount / total;
+
+            return avgDarkness * 0.55 + softDarkRatio * 0.45;
         }
 
-        function scanGridRegion(reg, threshold = 0.10) {
-            return scanGrid(reg.x, reg.y, reg.w, reg.h, reg.r, reg.c, threshold);
+        function scanGridRegion(reg, minScore = 0.13, labelStart = null, reviewIssues = null, options = {}) {
+            return scanGridSmart(reg.x, reg.y, reg.w, reg.h, reg.r, reg.c, minScore, labelStart, reviewIssues, options);
         }
 
-        function scanGrid(startX, startY, width, height, rows, cols, threshold = 0.10) {
+        function scanGridSmart(startX, startY, width, height, rows, cols, minScore = 0.13, labelStart = null, reviewIssues = null, options = {}) {
             const res = [];
             const cW = width / cols;
             const cH = height / rows;
 
+            const sampleRatio = options.sampleRatio || 0.58;
+            const minGap = options.minGap || 0.035;
+            const ratio = options.ratio || 1.18;
+            const strongScore = options.strongScore || 0.42;
+            const multiScore = options.multiScore || 0.24;
+            const issuePrefix = options.issuePrefix || '';
+
             for (let r = 0; r < rows; r++) {
-                let maxD = 0;
-                let bestC = -1;
+                const scores = [];
 
                 for (let c = 0; c < cols; c++) {
-                    const sX = startX + c * cW + cW * 0.125;
-                    const sY = startY + r * cH + cH * 0.125;
-                    const sW = cW * 0.75;
-                    const sH = cH * 0.75;
+                    const sX = startX + c * cW + cW * (1 - sampleRatio) / 2;
+                    const sY = startY + r * cH + cH * (1 - sampleRatio) / 2;
+                    const sW = cW * sampleRatio;
+                    const sH = cH * sampleRatio;
 
-                    const d = calculateDarkness(sX, sY, sW, sH);
-
-                    if (d > maxD) {
-                        maxD = d;
-                        bestC = c;
-                    }
+                    const score = calculateMarkScore(sX, sY, sW, sH);
+                    scores.push({ c, score });
                 }
 
-                res.push(maxD < threshold ? -1 : bestC);
+                scores.sort((a, b) => b.score - a.score);
+
+                const first = scores[0];
+                const second = scores[1] || { c: -1, score: 0 };
+
+                const label = labelStart !== null ? `${labelStart + r}번` : `${issuePrefix || '항목'}${r + 1}`;
+
+                let selected = -1;
+                let needsReview = false;
+                let issueReason = '';
+
+                const clearByGap = first.score - second.score >= minGap;
+                const clearByRatio = second.score === 0 || first.score >= second.score * ratio;
+                const strongEnough = first.score >= strongScore;
+
+                if (first.score < minScore) {
+                    selected = -1;
+                    needsReview = true;
+                    issueReason = '미마킹/흐림';
+                } else if (clearByGap || clearByRatio || strongEnough) {
+                    selected = first.c;
+
+                    if (second.score >= multiScore && second.score >= first.score * 0.65) {
+                        needsReview = true;
+                        issueReason = '중복가능';
+                    }
+                } else {
+                    selected = -1;
+                    needsReview = true;
+                    issueReason = '애매함';
+                }
+
+                if (needsReview && Array.isArray(reviewIssues)) {
+                    reviewIssues.push(`${label} ${issueReason}`);
+                }
+
+                res.push(selected);
             }
 
             return res;
@@ -1441,12 +1516,37 @@
         function performRealOMR() {
             const type = formTypeSelect.value;
             const r = getRegions(type);
+            const reviewIssues = [];
 
-            const classIdx = scanGridRegion(r.classGrid, 0.10)[0];
+            const classArr = scanGridRegion(r.classGrid, 0.12, null, reviewIssues, {
+                issuePrefix: '학반',
+                sampleRatio: 0.60,
+                minGap: 0.03,
+                ratio: 1.14,
+                strongScore: 0.36
+            });
+
+            const classIdx = classArr[0];
             const classNum = classIdx === -1 ? 0 : classIdx + 1;
 
-            const tenIdx = scanGridRegion(r.numTen, 0.10)[0];
-            const oneIdx = scanGridRegion(r.numOne, 0.10)[0];
+            const tenArr = scanGridRegion(r.numTen, 0.12, null, reviewIssues, {
+                issuePrefix: '번호십',
+                sampleRatio: 0.60,
+                minGap: 0.03,
+                ratio: 1.14,
+                strongScore: 0.36
+            });
+
+            const oneArr = scanGridRegion(r.numOne, 0.12, null, reviewIssues, {
+                issuePrefix: '번호일',
+                sampleRatio: 0.60,
+                minGap: 0.03,
+                ratio: 1.14,
+                strongScore: 0.36
+            });
+
+            const tenIdx = tenArr[0];
+            const oneIdx = oneArr[0];
 
             const tens = tenIdx === -1 ? 0 : tenIdx;
             const ones = oneIdx === -1 ? -1 : oneIdx;
@@ -1455,18 +1555,19 @@
 
             if (studentNum < 1 || studentNum > 29) {
                 studentNum = 0;
+                reviewIssues.push('출석번호 범위확인');
             }
 
             if (type === 'new20') {
-                const o1 = scanGridRegion(r.objLeft10);
-                const o2 = scanGridRegion(r.objRight6);
+                const o1 = scanGridRegion(r.objLeft10, 0.13, 1, reviewIssues, { issuePrefix: '객관식' });
+                const o2 = scanGridRegion(r.objRight6, 0.13, 11, reviewIssues, { issuePrefix: '객관식' });
 
                 const objAnswers = [...o1, ...o2].map(v => v === -1 ? 0 : v + 1);
 
-                const s17 = scanGridRegion(r.score17);
-                const s18 = scanGridRegion(r.score18);
-                const s19 = scanGridRegion(r.score19);
-                const s20 = scanGridRegion(r.score20);
+                const s17 = scanGridRegion(r.score17, 0.13, 17, reviewIssues, { issuePrefix: '점수', sampleRatio: 0.60 });
+                const s18 = scanGridRegion(r.score18, 0.13, 18, reviewIssues, { issuePrefix: '점수', sampleRatio: 0.60 });
+                const s19 = scanGridRegion(r.score19, 0.13, 19, reviewIssues, { issuePrefix: '점수', sampleRatio: 0.60 });
+                const s20 = scanGridRegion(r.score20, 0.13, 20, reviewIssues, { issuePrefix: '점수', sampleRatio: 0.60 });
 
                 const subScores = [s17[0], s18[0], s19[0], s20[0]];
 
@@ -1474,21 +1575,29 @@
                     classNum,
                     studentNum,
                     objAnswers,
-                    subScores
+                    subScores,
+                    reviewIssues
                 };
             }
 
             if (type === 'newA') {
-                const o1 = scanGridRegion(r.objLeft10);
-                const o2 = scanGridRegion(r.objRight8);
+                const o1 = scanGridRegion(r.objLeft10, 0.13, 1, reviewIssues, { issuePrefix: '객관식' });
+                const o2 = scanGridRegion(r.objRight8, 0.13, 11, reviewIssues, { issuePrefix: '객관식' });
 
                 const objAnswers = [...o1, ...o2].map(v => v === -1 ? 0 : v + 1);
 
-                const shorts = scanGridRegion(r.short19to21);
-                const s22 = scanGridRegion(r.score22);
-                const s23 = scanGridRegion(r.score23);
-                const s24 = scanGridRegion(r.score24);
-                const s25 = scanGridRegion(r.score25);
+                const shorts = scanGridRegion(r.short19to21, 0.13, 19, reviewIssues, {
+                    issuePrefix: '단답',
+                    sampleRatio: 0.62,
+                    minGap: 0.035,
+                    ratio: 1.15,
+                    strongScore: 0.38
+                });
+
+                const s22 = scanGridRegion(r.score22, 0.13, 22, reviewIssues, { issuePrefix: '점수', sampleRatio: 0.60 });
+                const s23 = scanGridRegion(r.score23, 0.13, 23, reviewIssues, { issuePrefix: '점수', sampleRatio: 0.60 });
+                const s24 = scanGridRegion(r.score24, 0.13, 24, reviewIssues, { issuePrefix: '점수', sampleRatio: 0.60 });
+                const s25 = scanGridRegion(r.score25, 0.13, 25, reviewIssues, { issuePrefix: '점수', sampleRatio: 0.60 });
 
                 const subScores = [
                     mapShortScore(shorts[0]),
@@ -1504,19 +1613,20 @@
                     classNum,
                     studentNum,
                     objAnswers,
-                    subScores
+                    subScores,
+                    reviewIssues
                 };
             }
 
-            const o1 = scanGridRegion(r.objLeft10);
-            const o2 = scanGridRegion(r.objRight11);
+            const o1 = scanGridRegion(r.objLeft10, 0.13, 1, reviewIssues, { issuePrefix: '객관식' });
+            const o2 = scanGridRegion(r.objRight11, 0.13, 11, reviewIssues, { issuePrefix: '객관식' });
 
             const objAnswers = [...o1, ...o2].map(v => v === -1 ? 0 : v + 1);
 
-            const s22 = scanGridRegion(r.score22);
-            const s23 = scanGridRegion(r.score23);
-            const s24 = scanGridRegion(r.score24);
-            const s25 = scanGridRegion(r.score25);
+            const s22 = scanGridRegion(r.score22, 0.13, 22, reviewIssues, { issuePrefix: '점수', sampleRatio: 0.60 });
+            const s23 = scanGridRegion(r.score23, 0.13, 23, reviewIssues, { issuePrefix: '점수', sampleRatio: 0.60 });
+            const s24 = scanGridRegion(r.score24, 0.13, 24, reviewIssues, { issuePrefix: '점수', sampleRatio: 0.60 });
+            const s25 = scanGridRegion(r.score25, 0.13, 25, reviewIssues, { issuePrefix: '점수', sampleRatio: 0.60 });
 
             const subScores = [s22[0], s23[0], s24[0], s25[0]];
 
@@ -1524,7 +1634,8 @@
                 classNum,
                 studentNum,
                 objAnswers,
-                subScores
+                subScores,
+                reviewIssues
             };
         }
 
