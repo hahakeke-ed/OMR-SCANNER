@@ -157,9 +157,27 @@
         </div>
 
         <div class="w-full md:w-2/3 flex flex-col">
+            <div class="flex items-center justify-between gap-2 mb-2 bg-gray-50 border rounded-lg px-3 py-2">
+                <button id="btnPrevScan" class="bg-gray-700 hover:bg-gray-800 text-white text-xs font-bold px-3 py-2 rounded disabled:bg-gray-300 disabled:text-gray-500" disabled>
+                    ◀ 앞장
+                </button>
+
+                <div id="scanPageInfo" class="text-xs md:text-sm font-bold text-gray-700 text-center flex-1 truncate">
+                    스캔 이미지 미리보기
+                </div>
+
+                <button id="btnNextScan" class="bg-gray-700 hover:bg-gray-800 text-white text-xs font-bold px-3 py-2 rounded disabled:bg-gray-300 disabled:text-gray-500" disabled>
+                    뒷장 ▶
+                </button>
+            </div>
+
             <div id="canvas-container">
                 <canvas id="mainCanvas"></canvas>
             </div>
+
+            <p class="text-[11px] text-gray-500 mt-2">
+                * 스캔 후 앞장/뒷장 버튼으로 각 시험지의 좌표 박스를 확인할 수 있습니다.
+            </p>
         </div>
     </div>
 
@@ -233,12 +251,19 @@
         const reportUi = document.getElementById('report-ui');
         const reportContainer = document.getElementById('reportContainer');
         const formTypeSelect = document.getElementById('formType');
+        const btnPrevScan = document.getElementById('btnPrevScan');
+        const btnNextScan = document.getElementById('btnNextScan');
+        const scanPageInfo = document.getElementById('scanPageInfo');
 
         let selectedFiles = [];
         let processingQueue = [];
         let globalProcessedImageData = null;
         let allStudentsData = [];
         let originalImage = null;
+
+        // ✅ 스캔 후 페이지별 미리보기 저장용
+        let scanPreviewPages = [];
+        let currentScanPreviewIndex = -1;
 
         function escapeHTML(str) {
             return String(str || '')
@@ -259,6 +284,65 @@
             subjCountInput.value = tpl.subjCount;
             renderAnswerTable();
         }
+
+        function resetScanPreviewPages() {
+            scanPreviewPages = [];
+            currentScanPreviewIndex = -1;
+            updateScanPreviewControls();
+        }
+
+        function saveCurrentCanvasAsScanPreview(name) {
+            const snapshot = document.createElement('canvas');
+            snapshot.width = mainCanvas.width;
+            snapshot.height = mainCanvas.height;
+
+            const sctx = snapshot.getContext('2d', { willReadFrequently: true });
+            sctx.drawImage(mainCanvas, 0, 0);
+
+            scanPreviewPages.push({
+                name: name || `스캔 ${scanPreviewPages.length + 1}`,
+                canvas: snapshot
+            });
+
+            currentScanPreviewIndex = scanPreviewPages.length - 1;
+            updateScanPreviewControls();
+        }
+
+        function showScanPreviewPage(index) {
+            if (index < 0 || index >= scanPreviewPages.length) return;
+
+            currentScanPreviewIndex = index;
+
+            const page = scanPreviewPages[index];
+
+            mainCanvas.width = page.canvas.width;
+            mainCanvas.height = page.canvas.height;
+            ctx.drawImage(page.canvas, 0, 0);
+
+            updateScanPreviewControls();
+        }
+
+        function updateScanPreviewControls() {
+            const total = scanPreviewPages.length;
+
+            btnPrevScan.disabled = total === 0 || currentScanPreviewIndex <= 0;
+            btnNextScan.disabled = total === 0 || currentScanPreviewIndex >= total - 1;
+
+            if (total === 0) {
+                scanPageInfo.innerText = '스캔 이미지 미리보기';
+            } else {
+                const page = scanPreviewPages[currentScanPreviewIndex];
+                scanPageInfo.innerText = `${currentScanPreviewIndex + 1} / ${total}쪽 - ${page.name}`;
+            }
+        }
+
+        btnPrevScan.addEventListener('click', () => {
+            showScanPreviewPage(currentScanPreviewIndex - 1);
+        });
+
+        btnNextScan.addEventListener('click', () => {
+            showScanPreviewPage(currentScanPreviewIndex + 1);
+        });
 
         function renderAnswerTable() {
             const objCount = parseInt(objCountInput.value) || 16;
@@ -317,10 +401,14 @@
             document.querySelectorAll('.answer-input').forEach(input => input.value = '');
         });
 
-        document.addEventListener('DOMContentLoaded', syncTemplateInputs);
+        document.addEventListener('DOMContentLoaded', () => {
+            syncTemplateInputs();
+            updateScanPreviewControls();
+        });
 
         imageUpload.addEventListener('change', async (e) => {
             selectedFiles = Array.from(e.target.files);
+            resetScanPreviewPages();
 
             if (selectedFiles.length === 0) {
                 btnProcess.disabled = true;
@@ -364,6 +452,7 @@
                 applyBinarization();
                 ctx.putImageData(globalProcessedImageData, 0, 0);
                 drawROIBoxes();
+                scanPageInfo.innerText = '업로드 첫 장 미리보기';
             } catch (e) {
                 console.error('미리보기 보정 실패:', e);
             }
@@ -382,6 +471,7 @@
             allStudentsData = [];
             csvOutput.value = '';
             btnViewReports.classList.add('hidden');
+            resetScanPreviewPages();
 
             const tpl = getCurrentTemplate();
             const objCount = tpl.objCount;
@@ -502,6 +592,8 @@
                     ctx.putImageData(globalProcessedImageData, 0, 0);
                     drawROIBoxes();
 
+                    saveCurrentCanvasAsScanPreview(item.name);
+
                     await new Promise(r => setTimeout(r, 30));
                 }
 
@@ -613,6 +705,10 @@
 
                 if (hasAnswerKey) {
                     btnViewReports.classList.remove('hidden');
+                }
+
+                if (scanPreviewPages.length > 0) {
+                    showScanPreviewPage(scanPreviewPages.length - 1);
                 }
 
             } catch (e) {
@@ -1106,7 +1202,6 @@
                     c: 10
                 },
 
-                // ✅ 객관식 좌표 재설정
                 objLeft10: {
                     x: 188,
                     y: 280,
@@ -1143,7 +1238,6 @@
                     c: 5
                 },
 
-                // ✅ A형 단답형 19~21번 0/4점 좌표 재설정
                 short19to21: {
                     x: 755,
                     y: 638,
@@ -1153,7 +1247,6 @@
                     c: 2
                 },
 
-                // ✅ 기본형 하단 점수판 좌표
                 scoreLT20: {
                     x: 173,
                     y: 921,
@@ -1190,7 +1283,6 @@
                     c: 6
                 },
 
-                // ✅ A형/B형 하단 점수판 좌표
                 scoreLT25: {
                     x: 169,
                     y: 948,
