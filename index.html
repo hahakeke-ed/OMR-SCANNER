@@ -92,20 +92,19 @@
                         <option value="newB">양식 B형 (총 25문항: 객21 + 주4 / 객관식 4점)</option>
                     </select>
                 </div>
-                
-<div class="grid grid-cols-2 gap-3">
-    <div>
-        <label class="block text-xs font-medium text-gray-700">객관식 문항 수</label>
-        <input type="number" id="objCount" value="16" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm bg-gray-100" readonly>
-    </div>
-    <div>
-        <label class="block text-xs font-medium text-gray-700">점수형 문항 수</label>
-        <input type="number" id="subjCount" value="4" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm bg-gray-100" readonly>
-    </div>
-</div>
 
-<input type="hidden" id="thresholdInput" value="145">
-           
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700">객관식 문항 수</label>
+                        <input type="number" id="objCount" value="16" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm bg-gray-100" readonly>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700">점수형 문항 수</label>
+                        <input type="number" id="subjCount" value="4" class="mt-1 w-full border border-gray-300 rounded p-1.5 text-sm bg-gray-100" readonly>
+                    </div>
+                </div>
+
+                <input type="hidden" id="thresholdInput" value="145">
 
                 <div>
                     <div class="flex justify-between items-end mb-1">
@@ -178,13 +177,13 @@
 
     <script>
         const STANDARD_W = 893;
-        const STANDARD_H = 1262;
+        const STANDARD_H = 1263;
 
         const MARKER_TARGETS = {
-            tl: { x: 48, y: 68 },
-            tr: { x: 843, y: 68 },
-            bl: { x: 58, y: 1204 },
-            br: { x: 852, y: 1204 }
+            tl: { x: 47, y: 68 },
+            tr: { x: 842, y: 68 },
+            bl: { x: 57, y: 1201 },
+            br: { x: 852, y: 1201 }
         };
 
         const TEMPLATE_CONFIGS = {
@@ -386,7 +385,6 @@
 
             const tpl = getCurrentTemplate();
             const objCount = tpl.objCount;
-            const subjCount = tpl.subjCount;
             const answerInputs = document.querySelectorAll('.answer-input[data-type="obj"]');
             const answerKey = Array.from(answerInputs)
                 .map(input => parseInt(input.value))
@@ -816,8 +814,6 @@
         }
 
         function findMarkers(imageData, w, h) {
-            const data = imageData.data;
-
             const rois = {
                 tl: { x0: 0, y0: 0, x1: Math.floor(w * 0.22), y1: Math.floor(h * 0.18), cornerX: 0, cornerY: 0 },
                 tr: { x0: Math.floor(w * 0.78), y0: 0, x1: w, y1: Math.floor(h * 0.18), cornerX: w, cornerY: 0 },
@@ -928,7 +924,6 @@
                     const centerX = (minX + maxX) / 2;
                     const centerY = (minY + maxY) / 2;
                     const dist = Math.hypot(centerX - roi.cornerX, centerY - roi.cornerY);
-
                     const score = dist + (1 - fill) * 60;
 
                     if (!best || score < best.score) {
@@ -1111,82 +1106,122 @@
                     c: 10
                 },
 
+                // ✅ 객관식 좌표 재설정
                 objLeft10: {
-                    x: 176,
-                    y: 281,
-                    w: 205,
-                    h: 450,
+                    x: 188,
+                    y: 280,
+                    w: 169,
+                    h: 447,
                     r: 10,
                     c: 5
                 },
 
                 objRight6: {
-                    x: 582,
-                    y: 281,
-                    w: 205,
-                    h: 270,
+                    x: 591,
+                    y: 280,
+                    w: 169,
+                    h: 269,
                     r: 6,
                     c: 5
                 },
 
                 objRight8: {
-                    x: 582,
-                    y: 281,
-                    w: 205,
-                    h: 360,
+                    x: 591,
+                    y: 280,
+                    w: 169,
+                    h: 358,
                     r: 8,
                     c: 5
                 },
 
                 objRight11: {
-                    x: 582,
+                    x: 591,
                     y: 281,
-                    w: 205,
-                    h: 495,
+                    w: 169,
+                    h: 494,
                     r: 11,
                     c: 5
                 },
 
+                // ✅ A형 단답형 19~21번 0/4점 좌표 재설정
                 short19to21: {
-                    x: 747,
-                    y: 633,
-                    w: 88,
-                    h: 142,
+                    x: 755,
+                    y: 638,
+                    w: 70,
+                    h: 135,
                     r: 3,
                     c: 2
                 },
 
-                scoreLT: {
-                    x: 158,
-                    y: 944,
-                    w: 222,
+                // ✅ 기본형 하단 점수판 좌표
+                scoreLT20: {
+                    x: 173,
+                    y: 921,
+                    w: 197,
                     h: 40,
                     r: 1,
                     c: 6
                 },
 
-                scoreRT: {
-                    x: 570,
-                    y: 944,
-                    w: 222,
+                scoreRT20: {
+                    x: 574,
+                    y: 921,
+                    w: 202,
                     h: 40,
                     r: 1,
                     c: 6
                 },
 
-                scoreLB: {
-                    x: 158,
-                    y: 1138,
-                    w: 222,
+                scoreLB20: {
+                    x: 169,
+                    y: 1135,
+                    w: 202,
                     h: 40,
                     r: 1,
                     c: 6
                 },
 
-                scoreRB: {
-                    x: 570,
-                    y: 1138,
-                    w: 222,
+                scoreRB20: {
+                    x: 574,
+                    y: 1135,
+                    w: 202,
+                    h: 40,
+                    r: 1,
+                    c: 6
+                },
+
+                // ✅ A형/B형 하단 점수판 좌표
+                scoreLT25: {
+                    x: 169,
+                    y: 948,
+                    w: 202,
+                    h: 40,
+                    r: 1,
+                    c: 6
+                },
+
+                scoreRT25: {
+                    x: 574,
+                    y: 948,
+                    w: 202,
+                    h: 40,
+                    r: 1,
+                    c: 6
+                },
+
+                scoreLB25: {
+                    x: 169,
+                    y: 1136,
+                    w: 202,
+                    h: 40,
+                    r: 1,
+                    c: 6
+                },
+
+                scoreRB25: {
+                    x: 574,
+                    y: 1136,
+                    w: 202,
                     h: 40,
                     r: 1,
                     c: 6
@@ -1200,10 +1235,10 @@
                     numOne: common.numOne,
                     objLeft10: common.objLeft10,
                     objRight6: common.objRight6,
-                    score17: common.scoreLT,
-                    score18: common.scoreRT,
-                    score19: common.scoreLB,
-                    score20: common.scoreRB
+                    score17: common.scoreLT20,
+                    score18: common.scoreRT20,
+                    score19: common.scoreLB20,
+                    score20: common.scoreRB20
                 };
             }
 
@@ -1215,10 +1250,10 @@
                     objLeft10: common.objLeft10,
                     objRight8: common.objRight8,
                     short19to21: common.short19to21,
-                    score22: common.scoreLT,
-                    score23: common.scoreRT,
-                    score24: common.scoreLB,
-                    score25: common.scoreRB
+                    score22: common.scoreLT25,
+                    score23: common.scoreRT25,
+                    score24: common.scoreLB25,
+                    score25: common.scoreRB25
                 };
             }
 
@@ -1228,10 +1263,10 @@
                 numOne: common.numOne,
                 objLeft10: common.objLeft10,
                 objRight11: common.objRight11,
-                score22: common.scoreLT,
-                score23: common.scoreRT,
-                score24: common.scoreLB,
-                score25: common.scoreRB
+                score22: common.scoreLT25,
+                score23: common.scoreRT25,
+                score24: common.scoreLB25,
+                score25: common.scoreRB25
             };
         }
 
