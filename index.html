@@ -73,7 +73,7 @@
         <div class="w-full md:w-1/3 flex flex-col gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-gray-800">OMR 자동 채점기</h1>
-                <p class="text-xs text-blue-600 mt-1 font-bold">✓ 양식 마커 보정 + 연필 진하기 보정 + 명부 연동 + 확인필요 표시</p>
+                <p class="text-xs text-blue-600 mt-1 font-bold">✓ 양식 마커 보정 + 연필 진하기 보정 + 복수 정답 + 명부 연동 + 확인필요 표시</p>
             </div>
 
             <div class="bg-blue-50 p-3 rounded-md border border-blue-100 flex flex-col gap-3">
@@ -115,7 +115,9 @@
                     <div class="overflow-x-auto border border-gray-300 rounded bg-white">
                         <table class="w-full text-center text-xs whitespace-nowrap" id="answerTable"></table>
                     </div>
-                    <p class="text-[10px] text-gray-500 mt-1">* 객관식 정답만 입력합니다. 단답/주관식은 OMR의 점수 마킹값을 그대로 합산합니다.</p>
+                    <p class="text-[10px] text-gray-500 mt-1">
+                        * 정답은 1~5로 입력합니다. 복수 정답은 1,4 또는 2/5처럼 입력할 수 있습니다. 모두 정답은 * 로 입력하세요.
+                    </p>
                 </div>
 
                 <div>
@@ -274,6 +276,56 @@
                 .replaceAll("'", '&#039;');
         }
 
+        function sanitizeAnswerInput(value) {
+            return String(value || '')
+                .replace(/\s+/g, '')
+                .replace(/[^1-5,\/\*]/g, '')
+                .slice(0, 15);
+        }
+
+        function parseAnswerCell(value) {
+            const clean = sanitizeAnswerInput(value);
+
+            if (!clean) {
+                return [];
+            }
+
+            if (clean.includes('*')) {
+                return [1, 2, 3, 4, 5];
+            }
+
+            const nums = clean
+                .split(/[,\//]+/)
+                .map(v => parseInt(v, 10))
+                .filter(n => !isNaN(n) && n >= 1 && n <= 5);
+
+            return Array.from(new Set(nums));
+        }
+
+        function answerKeyToText(answerList) {
+            if (!answerList || answerList.length === 0) {
+                return '';
+            }
+
+            if (answerList.length === 5) {
+                return '*';
+            }
+
+            return answerList.join(',');
+        }
+
+        function isAnswerCorrect(studentAnswer, answerList) {
+            if (!answerList || answerList.length === 0) {
+                return false;
+            }
+
+            if (!studentAnswer || studentAnswer < 1 || studentAnswer > 5) {
+                return false;
+            }
+
+            return answerList.includes(studentAnswer);
+        }
+
         function getCurrentTemplate() {
             return TEMPLATE_CONFIGS[formTypeSelect.value] || TEMPLATE_CONFIGS.new20;
         }
@@ -351,8 +403,8 @@
             let inputRow = `<tr>`;
 
             for (let i = 1; i <= objCount; i++) {
-                headerRow += `<th class="p-1 border-r border-blue-200 min-w-[28px] font-bold text-blue-800">${i}</th>`;
-                inputRow += `<td class="p-0 border-r border-gray-200"><input type="text" class="answer-input w-full p-1 text-center focus:bg-yellow-100 outline-none text-blue-700 font-bold" data-type="obj"></td>`;
+                headerRow += `<th class="p-1 border-r border-blue-200 min-w-[34px] font-bold text-blue-800">${i}</th>`;
+                inputRow += `<td class="p-0 border-r border-gray-200"><input type="text" class="answer-input w-full p-1 text-center focus:bg-yellow-100 outline-none text-blue-700 font-bold" data-type="obj" title="예: 3 / 1,4 / 2/5 / *"></td>`;
             }
 
             headerRow += `</tr>`;
@@ -363,7 +415,7 @@
             document.querySelectorAll('.answer-input').forEach(input => {
                 input.addEventListener('paste', handleExcelPaste);
                 input.addEventListener('input', function () {
-                    this.value = this.value.replace(/[^1-5]/g, '').slice(0, 1);
+                    this.value = sanitizeAnswerInput(this.value);
                 });
             });
         }
@@ -377,15 +429,14 @@
             let targetRow = rows.length > 1 ? rows[rows.length - 1] : rows[0];
             let values = targetRow.split('\t');
 
-            if (values.length > 0 && isNaN(parseInt(values[0]))) {
+            if (values.length > 0 && isNaN(parseInt(values[0])) && !String(values[0]).includes('*')) {
                 values.shift();
             }
 
             const inputs = document.querySelectorAll('.answer-input[data-type="obj"]');
 
             for (let i = 0; i < Math.min(values.length, inputs.length); i++) {
-                let val = values[i].trim().replace(/[^1-5]/g, '').slice(0, 1);
-                if (val) inputs[i].value = val;
+                inputs[i].value = sanitizeAnswerInput(values[i]);
             }
         }
 
@@ -477,11 +528,11 @@
             const tpl = getCurrentTemplate();
             const objCount = tpl.objCount;
             const answerInputs = document.querySelectorAll('.answer-input[data-type="obj"]');
-            const answerKey = Array.from(answerInputs)
-                .map(input => parseInt(input.value))
-                .map(n => isNaN(n) ? 0 : n);
 
-            const hasAnswerKey = answerKey.some(n => n > 0);
+            const answerKey = Array.from(answerInputs).map(input => parseAnswerCell(input.value));
+            const answerKeyText = answerKey.map(list => answerKeyToText(list));
+            const hasAnswerKey = answerKey.some(list => list.length > 0);
+
             const subjectName = subjectNameInput.value.trim() || '미지정 과목';
 
             const rosterLines = rosterInput.value.trim().split(/\r?\n/);
@@ -631,7 +682,7 @@
 
                     if (hasAnswerKey) {
                         for (let q = 0; q < objCount; q++) {
-                            if (objAns[q] === answerKey[q] && answerKey[q] !== 0) {
+                            if (isAnswerCorrect(objAns[q], answerKey[q])) {
                                 objScore += tpl.objPoint;
                                 objCorr.push('O');
                             } else {
@@ -642,7 +693,6 @@
                     }
 
                     const safeSubSc = subSc.map(v => Math.max(0, Number(v) || 0));
-
                     let subjCorr = [];
 
                     for (let i = 0; i < safeSubSc.length; i++) {
@@ -682,7 +732,8 @@
                         totalScore,
                         objCount,
                         subjLabels: tpl.subjLabels,
-                        templateLabel: tpl.label
+                        templateLabel: tpl.label,
+                        answerKeyText
                     });
                 }
 
@@ -766,6 +817,7 @@
                                     <div class="flex justify-between text-xs border-b">
                                         <span>${i + 1}번</span>
                                         <span>마킹:${a > 0 ? a : '-'}</span>
+                                        <span>정답:${s.answerKeyText && s.answerKeyText[i] ? escapeHTML(s.answerKeyText[i]) : '-'}</span>
                                         <span class="font-bold ${s.objCorrect[i] === 'O' ? 'text-blue-600' : 'text-red-500'}">${s.objCorrect[i] || ''}</span>
                                     </div>
                                 `).join('')}
